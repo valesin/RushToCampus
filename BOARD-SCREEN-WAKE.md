@@ -29,7 +29,7 @@ You want to see `DSI-1 connected 800x480` (or similar) afterward.
 If the game was stopped somehow, start it **without** touching the display manager:
 
 ```bash
-adb shell "arduino-app-cli app start user:bikergame"
+adb shell "arduino-app-cli app start user:rushtocampus"
 ```
 
 ## If gentle wake isn’t enough
@@ -39,10 +39,10 @@ adb shell "arduino-app-cli app start user:bikergame"
 2. Reseat the **DSI ribbon** to the 7″ panel if power-cycle still leaves it dark.
 3. Confirm the game is actually running:
    ```bash
-   adb shell "arduino-app-cli app list" | grep user:bikergame
+   adb shell "arduino-app-cli app list" | grep user:rushtocampus
    adb shell "docker stats --no-stream"
    ```
-   CPU on `bikergame-game_runner-1` means it’s rendering even if the panel looks off.
+   CPU on `rushtocampus-game_runner-1` means it’s rendering even if the panel looks off.
 
 ## What not to do
 
@@ -59,4 +59,4 @@ adb shell "arduino-app-cli app start user:bikergame"
 | Black screen, game `running` | DSI panel asleep / stuck | Gentle `xrandr` wake above |
 | Black screen after “fixing display” | `lightdm` was restarted | Gentle wake; avoid another lightdm restart |
 | Still black after wake + power-cycle | Cable / panel hardware | Reseat DSI ribbon |
-| App not `running` | Game not started | `arduino-app-cli app start user:bikergame` |
+| App not `running` | Game not started | `arduino-app-cli app start user:rushtocampus` |

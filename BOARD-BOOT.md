@@ -23,14 +23,14 @@ display to be ready.
 Ask Claude (or run yourself over USB):
 
 ```bash
-adb shell "arduino-app-cli app start user:bikergame"
+adb shell "arduino-app-cli app start user:rushtocampus"
 ```
 
 To check status:
 
 ```bash
 adb devices
-adb shell "arduino-app-cli app list" | grep user:bikergame
+adb shell "arduino-app-cli app list" | grep user:rushtocampus
 ```
 
 `running` means the app containers are up. If the screen is still black, that’s a
@@ -40,6 +40,7 @@ display issue — see `BOARD-SCREEN-WAKE.md`, not a missing start.
 
 - **Joystick up / down** — change lane  
 - **A** — confirm / start  
+- **B** — boost (2 seconds, costs 20 energy)  
 - **C** — pause  
 
 (Joystick left/right are unused in the cycling runner.)
