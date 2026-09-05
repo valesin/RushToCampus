@@ -16,6 +16,7 @@ docs/
 .summer/local/
 
 # Dependencies & build output
+build/
 node_modules/
 .next/
 
