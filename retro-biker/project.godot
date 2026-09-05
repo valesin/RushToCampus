@@ -85,6 +85,7 @@ cycling_boost={
 }
 
 [rendering]
+gl_compatibility/driver.windows="opengl3_angle"
 
 textures/canvas_textures/default_texture_filter=0.0
 renderer/rendering_method="gl_compatibility"

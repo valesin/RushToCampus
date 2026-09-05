@@ -2,8 +2,8 @@ extends RefCounted
 ## One projection for art and debug geometry. Simulation remains metres/lane units.
 const WIDTH: float = 960.0
 const HEIGHT: float = 540.0
-const CITY_HEIGHT: float = 81.0
-const LANE_HEIGHT: float = 91.8
+const CITY_HEIGHT: float = 135.0
+const LANE_HEIGHT: float = 81.0
 const PLAYER_X: float = 240.0
 const GROUND_FRACTION: float = 0.78
 static func lane_top(lane: int) -> float:

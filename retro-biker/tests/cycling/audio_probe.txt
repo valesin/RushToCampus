@@ -14,7 +14,7 @@ func _ready() -> void:
 	game.set_physics_process(false)
 	game.traffic.enabled = false
 	var sound = game.cycling_audio
-	report("all_streams_loaded",sound.streams.size() == 11)
+	report("all_streams_loaded",sound.streams.size() == 14)
 	report("no_template_music",not GameManager._music.playing and GameManager._current_track == "")
 	game.start_run()
 	await frames()
