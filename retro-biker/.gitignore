@@ -1,0 +1,23 @@
+# Summer Engine defaults
+.godot/
+*.import
+*.translation
+.DS_Store
+Thumbs.db
+
+# AI tooling
+.claude/
+.specstory/
+
+# Internal design docs — kept local, not shipped in the template
+docs/
+
+# Summer Engine local-only state (SummerGit, caches, locks)
+.summer/local/
+
+# Dependencies & build output
+node_modules/
+.next/
+
+# Environment
+.env*

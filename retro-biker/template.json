@@ -1,0 +1,42 @@
+{
+  "id": "2d-brario-platformer",
+  "version": "1.1.2",
+  "name": "2D Platformer",
+  "engineMinVersion": "0.5.43",
+  "entryScene": "res://scenes/MainMenu.tscn",
+  "dimension": "2D",
+  "mechanics": [
+    "2d-platformer-controller",
+    "stomp-combat",
+    "moving-platforms",
+    "bounce-pads",
+    "crumbling-blocks",
+    "slopes",
+    "hazards",
+    "collectibles",
+    "health-and-iframes",
+    "boss-fight",
+    "level-progression",
+    "ascii-tilemap-levels",
+    "hud",
+    "music-and-sfx"
+  ],
+  "genres": [
+    "platformer",
+    "sidescroller",
+    "arcade"
+  ],
+  "agentBrief": "A complete side-scrolling 2D platformer (Godot 4.6 Mono). ENTRY SCENE: res://scenes/MainMenu.tscn — the game boots to a working main menu whose Start button calls GameManager.reset_game(), which switches to res://scenes/Level.tscn. Level.tscn also runs standalone if you want to skip the menu while iterating: its _ready reads GameManager.current_level (defaults to 0) and builds level 1. LEVELS: the standout system — levels are 32x32 ASCII grids in levels/level_01.txt … level_04.txt, parsed by scripts/level_loader.gd, which instances a scene per character and sets camera bounds. Tile legend: '#' block, 'P' player spawn, 'G' critter enemy, 'D' exit door, '-' horizontal moving platform, '|' vertical moving platform, '/' slope up, '\\' slope down, 'o' bounce pad, 'x' crumbling block, '^' spike, 's' sawblade, 'c' coin, 'h' heart, 'B' boss. ADD A LEVEL: drop levels/level_05.txt and append its path to the level_files array in scripts/game_manager.gd — this is the cheapest, highest-leverage way to extend the game. ADD A TILE TYPE: make a scene and add a match case in level_loader.gd. PLAYER: scenes/Player.tscn + scripts/player.gd (CharacterBody2D: run, jump, stomp-to-kill; take a side hit and lose a heart, with i-frames and knockback; 3 hearts). BOSS: scenes/Boss.tscn + scripts/boss.gd — the 'Critter King' paces the arena, telegraphs charge-dashes, enrages at low health, dies in 3 stomps. AUTOLOADS (2, wired in project.godot): GameManager (lives, coins, level progression, music switching) and Sfx (pooled one-shot player) — extend these rather than adding parallel singletons. INPUT ACTIONS (already bound): move_left (A / Left), move_right (D / Right), jump (Space / W / Up). UI: scenes/HUD.tscn (hearts + coin counter) plus MainMenu, GameOver and WinScreen scenes, all fully wired via GameManager.reset_game() / go_to_menu(). The menu chain works out of the box: menu → play → game over or win → retry or menu. Reskin these rather than replacing them; if the user wants to drop straight into gameplay, point run/main_scene at res://scenes/Level.tscn. ASSETS: assets/sprites/ and assets/audio/ are all first-party — sprites are drawn procedurally by the PowerShell scripts in tools/, audio was generated in Summer Studio, so everything is safe to redistribute and reskin. tools/ is dev-only, not game runtime. CUSTOMIZE BY: writing new ASCII levels, retuning player @exports, reskinning the sprites in assets/sprites/, adding tile types and enemies on the existing loader — do not rewrite the level_loader/GameManager spine.",
+  "shipsProjectGodot": true,
+  "userFacing": {
+    "tagline": "A complete side-scrolling platformer: stomp combat, hazards, a boss, and levels you write as text files.",
+    "highlights": [
+      "Tuned platformer controller with stomp-to-kill combat, hearts and i-frames",
+      "Levels authored as plain-text ASCII grids — add a level by dropping in a text file",
+      "Moving platforms, slopes, bounce pads, crumbling blocks, spikes and sawblades",
+      "Boss fight against the Critter King: charge-dashes, enrage phase, three stomps",
+      "Coins, hearts, HUD, and a full music and SFX layer",
+      "Every sprite and sound is first-party and free to reskin or ship"
+    ]
+  }
+}
