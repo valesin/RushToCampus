@@ -3,7 +3,7 @@
 [ext_resource type="Script" uid="uid://cx4el0bqn8xql" path="res://scripts/level_loader.gd" id="1"]
 [ext_resource type="Script" uid="uid://c7ls0ncqjsict" path="res://scripts/camera.gd" id="2"]
 [ext_resource type="PackedScene" path="res://scenes/HUD.tscn" id="3"]
-[ext_resource type="Texture2D" uid="uid://dj378afb6g7am" path="res://assets/sprites/sky.jpg" id="4"]
+[ext_resource type="Texture2D" uid="uid://bmwbcniu1vdnr" path="res://assets/sprites/city_street.png" id="4"]
 
 [node name="Level" type="Node2D" unique_id=1795932815]
 script = ExtResource("1")
@@ -12,8 +12,7 @@ script = ExtResource("1")
 script = ExtResource("2")
 
 [node name="Background" type="Sprite2D" parent="Camera2D" unique_id=1058788702]
-z_index = -1
-position = Vector2(-534, -300)
+z_index = -10
 texture = ExtResource("4")
 centered = false
 
