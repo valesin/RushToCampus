@@ -9,6 +9,7 @@ var city_texture: Texture2D
 var atlas_frames: Array[Texture2D] = []
 var layers: Array[Node2D] = []
 var render_distance: float = 0.0
+var bread_style: StyleBoxFlat = food_bread_style()
 const REGIONS: Dictionary = {
 	"player": Rect2(106, 90, 350, 365),
 	"cyclist": Rect2(583, 91, 359, 365),
@@ -69,6 +70,7 @@ func render_layer(c: Node2D, layer_id: int) -> void:
 		0: draw_world(c)
 		1: draw_traffic(c)
 		2:
+			draw_food(c)
 			draw_hud(c)
 			draw_overlay(c)
 
@@ -156,12 +158,12 @@ func draw_hud(c: Node2D) -> void:
 	text(c,Vector2(18,54),"UNIVERSITY / 1.5 KM",14,MUTED)
 	text(c,Vector2(275,27),"%d m LEFT" % int(ceil(maxf(0,game.route_length-game.distance))),24)
 	text(c,Vector2(275,54),"%d:%02d  /  %d km/h" % [int(game.elapsed)/60,int(game.elapsed)%60,int(game.rider.speed*3.6)],16,MUTED)
-	text(c,Vector2(505,24),"ENERGY %d%% %s" % [int(game.rider.energy),"↑" if game.rider.energy_change>0 else "↓"],17)
+	text(c,Vector2(505,24),"ENERGY %d%% %s" % [int(game.rider.energy),"+" if game.rider.energy_change>0 else "-" if game.rider.energy_change<0 else ""],17)
 	c.draw_rect(Rect2(505,36,165,12),Color("#58605a"))
 	c.draw_rect(Rect2(505,36,165*game.rider.energy/100.0,12),GREEN if game.rider.recovering else GOLD)
-	var effort: String = "SHELTERED" if game.rider.sheltered else "RECOVERING" if game.rider.recovering else "PEDALLING"
-	text(c,Vector2(700,25),effort,19,GREEN if game.rider.recovering or game.rider.sheltered else GOLD)
-	text(c,Vector2(700,53),game.wind.warning() if game.wind.warning() != "" else game.wind.phase(),13,MUTED)
+	var effort: String = "RECOVER %.1fs" % game.rider.recovery_left if game.rider.recovering else "BOOST %.1fs" % game.rider.boost_left if game.rider.boost_left > 0.0 else "K / B  BOOST READY" if game.rider.boost_ready() else "BOOST NEEDS 20"
+	text(c,Vector2(700,25),effort,16,GREEN if game.rider.recovering or game.rider.sheltered else GOLD)
+	text(c,Vector2(700,53),game.wind.warning() if game.wind.warning() != "" else game.wind.phase() + (" / DRAFT" if game.rider.sheltered else ""),13,MUTED)
 	c.draw_rect(Rect2(0,67,960*clampf(game.distance/game.route_length,0,1),3),GOLD)
 
 func draw_overlay(c: Node2D) -> void:
@@ -191,8 +193,46 @@ func draw_overlay(c: Node2D) -> void:
 	text(c,Vector2(200,180),title,28,GOLD)
 	text(c,Vector2(200,221),detail,19)
 	text(c,Vector2(200,261),"UP / DOWN or W / S — switch lanes",19)
-	text(c,Vector2(200,298),"Draft to save energy. Ease off, recover, go again.",17,MUTED)
+	text(c,Vector2(200,298),"K / B: 2s boost · costs 20. At zero: 2s recovery.",17,MUTED)
+	text(c,Vector2(200,325),"Rugbrød +20 · Danish +30 · Draft blocks headwind drain",15,MUTED)
 	text(c,Vector2(200,350),action,20,GOLD)
 	text(c,Vector2(200,389),"Click game to focus  |  Handheld: A start / C pause",14,MUTED)
 	if game.score_write_error:
 		text(c,Vector2(200,408),"Best score could not be saved.",13,MUTED)
+
+func draw_food(c: Node2D) -> void:
+	for item in game.food.items:
+		var at := Vector2(240.0 + (item.distance - render_distance) * game.pixels_per_metre, lane_y(item.lane) - 24.0)
+		if at.x < -60.0 or at.x > 1020.0: continue
+		c.draw_circle(at, 24.0, Color("#293638"))
+		c.draw_arc(at,24.0,0.0,TAU,32,GOLD,2.0,true)
+		if item.kind == "bread":
+			# Dark rye slice, crust and pale seeds, in the existing muted palette.
+			c.draw_style_box(bread_style,Rect2(at-Vector2(18,13),Vector2(36,27)))
+			for seed_at in [Vector2(-10,-5),Vector2(0,4),Vector2(9,-6),Vector2(-9,7),Vector2(11,6)]:
+				c.draw_line(at+seed_at,at+seed_at+Vector2(3,-2),Color("#d4bc86"),2.0)
+		else:
+			# Folded spandauer: flaky corners, golden dough and custard centre.
+			var outline := PackedVector2Array()
+			var dough := PackedVector2Array()
+			for point in [Vector2(-18,-9),Vector2(-10,-17),Vector2(0,-13),Vector2(12,-17),Vector2(19,-5),Vector2(14,0),Vector2(18,11),Vector2(7,18),Vector2(0,14),Vector2(-13,17),Vector2(-18,7),Vector2(-13,0)]:
+				outline.append(at+point)
+				dough.append(at+point*0.82)
+			c.draw_colored_polygon(outline,Color("#975b34"))
+			c.draw_colored_polygon(dough,GOLD)
+			c.draw_circle(at,7.0,Color("#af713c"))
+			c.draw_circle(at,5.0,Color("#edcf82"))
+			for offset in [Vector2(-11,-9),Vector2(8,-10),Vector2(-10,9),Vector2(8,10)]:
+				c.draw_line(at+offset-Vector2(2,1),at+offset+Vector2(3,-1),INK,2.0,true)
+		text(c,at+Vector2(-14,39),"+20" if item.kind == "bread" else "+30",13,GOLD)
+	if game.food.feedback_left > 0.0:
+		c.draw_rect(Rect2(365,78,230,31),Color("#293638"))
+		text(c,Vector2(389,100),game.food.feedback,18,GOLD)
+
+func food_bread_style() -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color("#735039")
+	style.border_color = Color("#412f29")
+	style.set_border_width_all(3)
+	style.set_corner_radius_all(5)
+	return style

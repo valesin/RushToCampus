@@ -65,6 +65,8 @@ func ensure_bus(bus_name: String, send: String = "Master") -> void:
 
 func make_voice(clip: String, bus_name: String, looping: bool) -> AudioStreamPlayer:
 	var voice := AudioStreamPlayer.new()
+	# Streaming avoids the web sample loop allocation failure and retains bus effects.
+	if OS.has_feature("web"): voice.playback_type = AudioServer.PLAYBACK_TYPE_STREAM
 	voice.bus = bus_name
 	voice.volume_db = -80.0
 	add_child(voice)
@@ -99,7 +101,7 @@ func update_mix(delta: float) -> void:
 	if game == null: return
 	var paused: bool = game.state == game.RunState.PAUSED
 	for child in get_children():
-		if child is AudioStreamPlayer: child.stream_paused = paused
+		if child is AudioStreamPlayer and child.stream_paused != paused: child.stream_paused = paused
 	if paused: return
 	var running: bool = game.state == game.RunState.RUNNING
 	bell_left = maxf(0.0, bell_left-delta)
@@ -124,7 +126,7 @@ func update_mix(delta: float) -> void:
 	set_loop(rider_voices[2], -32.0 + linear_to_db(ratio), game.rider.recovering)
 	for i in 3:
 		rider_voices[i].pitch_scale = clampf(0.65+ratio*0.35,0.7,1.12)
-	var exposure: float = clampf((1.0-game.wind.values(false).x)/0.25,0.0,1.0)
+	var exposure: float = 1.0 if game.wind.phase() == "HEADWIND" else 0.0
 	var wind_target: float = lerpf(-34.0,-21.0,exposure) - (9.0 if game.rider.sheltered else 0.0)
 	wind_gain_db = move_toward(wind_gain_db,wind_target,18.0/maxf(0.1,shelter_fade_seconds)*delta)
 	set_loop(rider_voices[3],wind_gain_db)

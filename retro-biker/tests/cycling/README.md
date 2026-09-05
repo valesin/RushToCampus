@@ -1,3 +1,27 @@
+# Boost and food verification - 5 September 2026
+
+The current energy model supersedes the historical commute figures below.
+
+Run with stock Godot 4.7.2 from the game directory, redirecting APPDATA to a disposable workspace folder:
+
+```powershell
+$env:APPDATA = '<workspace>/work/appdata'
+& '<godot-console.exe>' --headless --path . --script res://tests/cycling/web_checks.gd
+& '<godot-console.exe>' --headless --path . --script res://tests/cycling/playthrough.gd
+& '<godot-console.exe>' --path . --position 16000,16000 --script res://tests/cycling/render_checks.gd -- '<output-directory>'
+& '<godot-console.exe>' --headless --path . --export-release Web '<output-directory>/index.html'
+```
+
+`web_checks.gd` is a SceneTree harness; it does not require SummerProbeBase. It runs the existing regression suite plus `energy_checks.gd`. `playthrough.gd` drives real keyboard events over physics frames, then compares full-route cruise, repeated exhaustion and food-assisted runs. The balance comparison disables traffic deliberately; the separate seeded director sweep measures pickup availability with traffic. `render_checks.gd` captures staged pickup and recovery fixtures, not a completed playthrough.
+
+Inputs: W/S or Up/Down change lane; K / handheld B boosts; Enter/Space/J / handheld A starts or retries; Escape/L / handheld C pauses. Boost is edge-triggered. Collision cooldown remains collision-only.
+
+Safety checks cover 3.6, 7.2, 7.8, 10.8, 14.4, 15.84 and 21.6 m/s. Food requires a reachable pickup waypoint with a safe continuation; active pickups reject future traffic that would overlap them or invalidate the approach. The graph is a conservative sampled guard, not a proof for arbitrary speed changes or player decisions. Unsafe opportunities retry after 0.5s. Bread begins searching at 6-6.5s to leave retry room inside the 6-8s target; pastries begin searching at 18-23s within the 18-24s target. Safety takes precedence if an exceptional layout cannot satisfy the window.
+
+Web-only audio streaming avoids the observed sample-loop allocation failure and retains the existing audio buses/effects. Native/Uno Q playback and Linux arm64 export settings remain intact. The Web preset references the verified local toolchain; adjust those two template paths on another machine.
+
+## Historical baseline evidence (not current gameplay results)
+
 # Three-minute commute verification — 5 September 2026
 ## Reproduce
 Run gameplay_probe.txt through Summer MCP RunVerification (max_seconds25) for runner_checks.gd and start/pause/retry checks.

@@ -5,6 +5,8 @@ const DirectorScript = preload("res://scripts/cycling/traffic_director.gd")
 const ActorScript = preload("res://scripts/cycling/traffic_actor.gd")
 const PresentationScript = preload("res://scripts/cycling/presentation.gd")
 const AudioScript = preload("res://scripts/cycling/cycling_audio.gd")
+const FoodScript = preload("res://scripts/cycling/food_director.gd")
+var food = FoodScript.new()
 var cycling_audio
 
 enum RunState { READY, RUNNING, PAUSED, CRASHED, RESULTS, SUCCESS }
@@ -31,6 +33,8 @@ func _ready() -> void:
 	add_child(rider)
 	add_child(wind)
 	add_child(traffic)
+	add_child(food)
+	traffic.food = food
 	presentation = PresentationScript.new()
 	presentation.name = "Presentation"
 	presentation.game = self
@@ -39,6 +43,7 @@ func _ready() -> void:
 	best_distance = read_best(score_path)
 	rider.reset()
 	traffic.reset()
+	food.reset()
 	GameManager.stop_music()
 	cycling_audio = AudioScript.new()
 	cycling_audio.name = "CyclingAudio"
@@ -52,6 +57,7 @@ func start_run() -> void:
 	rider.reset()
 	wind.reset()
 	traffic.reset()
+	food.reset()
 	distance = 0.0
 	previous_distance = 0.0
 	elapsed = 0.0
@@ -61,6 +67,11 @@ func start_run() -> void:
 	if cycling_audio != null: cycling_audio.reset()
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_released("cycling_boost"):
+		rider.boost_input(false)
+	if state == RunState.RUNNING and event.is_action_pressed("cycling_boost") and not event.is_echo():
+		rider.boost_input(true)
+		get_viewport().set_input_as_handled()
 	# Consume distinct key edges too, so a quick tap between physics ticks is not lost.
 	if state == RunState.RUNNING and not event.is_echo():
 		if event.is_action_pressed("cycling_up"):
@@ -120,6 +131,9 @@ func simulate(delta: float) -> void:
 			contact(actor)
 			if state != RunState.RUNNING:
 				break
+
+	if state == RunState.RUNNING:
+		food.step(travel_delta, self)
 
 	if state == RunState.RUNNING and distance >= route_length - 0.0001:
 		distance = route_length

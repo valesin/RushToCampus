@@ -7,6 +7,8 @@ const Definition = preload("res://scripts/cycling/traffic_definition.gd")
 @export var safe_start_seconds: float = 5.0
 @export var initial_interval: float = 5.0
 @export var final_interval: float = 2.8
+var food
+const CHECK_SPEEDS: Array[float] = [3.6, 7.2, 7.8, 10.8, 14.4, 15.84, 21.6]
 var actors: Array = []
 var pool: Array = []
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
@@ -84,10 +86,18 @@ func step(delta: float, elapsed: float, rider_distance: float, rider_lane: int, 
 	# Conservative checks at exhausted/headwind, calm, and full/tailwind speeds.
 	# Runtime movement is continuous; graph edges use the same swept hit test.
 	var safe: bool = true
-	for speed_value in [2.7, 5.4, 9.0, 12.0, 14.4]:
+	for speed_value in CHECK_SPEEDS:
 		if not has_route(combined, rider_distance, rider_lane, speed_value, rider_size):
 			safe = false
 			break
+	if safe and food != null:
+		safe = food.traffic_clear(candidate, rider_distance)
+		for item in food.items:
+			if item.distance <= rider_distance: continue
+			for speed_value in CHECK_SPEEDS:
+				if not has_route(combined, rider_distance, rider_lane, speed_value, rider_size, item.distance, item.lane):
+					safe = false
+					break
 	if safe:
 		actors.append_array(candidate)
 		accepted += 1
@@ -95,15 +105,17 @@ func step(delta: float, elapsed: float, rider_distance: float, rider_lane: int, 
 		pool.append_array(candidate)
 		rejected += 1
 
-func has_route(candidates: Array, rider_distance: float, rider_lane: int, speed_value: float, rider_size: Vector2) -> bool:
+func has_route(candidates: Array, rider_distance: float, rider_lane: int, speed_value: float, rider_size: Vector2, pickup_distance: float = -1.0, pickup_lane: int = -1) -> bool:
 	var reachable: Array[int] = [rider_lane]
 	var dt: float = 0.20 # slightly slower than actual lane transition: safety margin
-	for tick in range(90):
+	var pickup_time: float = (pickup_distance - rider_distance) / speed_value
+	for tick in range(maxi(90, int(ceil(pickup_time / dt)) + 10)):
 		var t0: float = tick * dt
 		var t1: float = t0 + dt
 		var following: Array[int] = []
 		for lane_from in reachable:
 			for lane_to in range(maxi(0, lane_from - 1), mini(4, lane_from + 1) + 1):
+				if pickup_lane >= 0 and t0 <= pickup_time and t1 > pickup_time and (lane_from != pickup_lane or lane_to != pickup_lane): continue
 				var safe: bool = true
 				for actor in candidates:
 					var start := Vector2(actor.distance - rider_distance + (actor.definition.speed - speed_value) * t0, actor.definition.lane - lane_from)
@@ -116,6 +128,11 @@ func has_route(candidates: Array, rider_distance: float, rider_lane: int, speed_
 						break
 				if safe and not following.has(lane_to):
 					following.append(lane_to)
+		if pickup_lane >= 0:
+			if t0 <= pickup_time and t1 > pickup_time:
+				# Require a settled lane on both sides of the pickup crossing.
+				if not reachable.has(pickup_lane) or not following.has(pickup_lane): return false
+				following.assign([pickup_lane])
 		if following.is_empty():
 			return false
 		reachable = following

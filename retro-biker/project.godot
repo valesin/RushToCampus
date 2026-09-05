@@ -80,6 +80,11 @@ cycling_pause={
 ]
 }
 
+cycling_boost={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"keycode":75)]
+}
+
 [rendering]
 
 textures/canvas_textures/default_texture_filter=0.0

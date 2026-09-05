@@ -39,17 +39,18 @@ static func run(game) -> Dictionary:
 	wind.elapsed = 10.5
 	checks["wind_warning"] = wind.warning() == "HEADWIND APPROACHING"
 	wind.elapsed = 12.5
-	checks["wind_blends"] = is_equal_approx(wind.values(false).x, 0.875)
+	checks["headwind_no_speed_loss"] = wind.values(false).x == 1.0
 	wind.elapsed = 13.0
-	checks["headwind_rates"] = wind.values(false) == Vector2(0.75, -3.0)
-	checks["sheltered_rates"] = wind.values(true) == Vector2(0.9, 0.0)
+	checks["headwind_rates"] = wind.values(false) == Vector2(1.0, -4.0)
+	checks["sheltered_rates"] = wind.values(true) == Vector2(1.0, 0.0)
 	wind.elapsed = 37.0
-	checks["tailwind_rates"] = wind.values(false) == Vector2(1.2, 3.0)
+	checks["tailwind_rates"] = wind.values(false) == Vector2(1.1, 0.0)
 	wind.free()
 
 	game.start_run()
 	game.set_physics_process(false)
 	game.traffic.enabled = false
+	game.food.enabled = false
 	game.wind.elapsed = 13.0
 	game.rider.energy = 60.0
 	var lead = game.traffic.make_actor("cyclist", 3, 9.0)
@@ -57,7 +58,7 @@ static func run(game) -> Dictionary:
 	for i in 120:
 		game.simulate(1.0 / 60.0)
 	checks["draft_gap_stable"] = absf(lead.distance - game.distance - 9.0) < 0.05
-	checks["draft_conserves_energy"] = absf(game.rider.energy - 58.0) < 0.1 and game.rider.sheltered
+	checks["draft_conserves_energy"] = absf(game.rider.energy - 60.0) < 0.1 and game.rider.sheltered
 	game.rider.lane_input(0)
 	game.rider.lane_input(-1)
 	game.simulate(1.0 / 60.0)
@@ -67,12 +68,12 @@ static func run(game) -> Dictionary:
 	game.rider.energy = 100.0
 	var pedestrian = game.traffic.make_actor("pedestrian", 4, 0)
 	game.contact(pedestrian)
-	checks["minor_hit_penalty"] = game.rider.energy == 80.0 and game.rider.slowdown_left == 0.8 and game.state == game.RunState.RUNNING
+	checks["minor_hit_penalty"] = game.rider.energy == 100.0 and game.rider.slowdown_left == 0.8 and game.state == game.RunState.RUNNING
 	game.contact(pedestrian)
-	checks["same_actor_once"] = game.rider.energy == 80.0
+	checks["same_actor_once"] = game.rider.energy == 100.0
 	var other = game.traffic.make_actor("cyclist", 3, 0)
 	game.contact(other)
-	checks["minor_cooldown"] = game.rider.energy == 80.0
+	checks["minor_cooldown"] = game.rider.energy == 100.0
 	var car = game.traffic.make_actor("car", 3, 0)
 	game.contact(car)
 	checks["lethal_during_cooldown"] = game.state == game.RunState.CRASHED
@@ -119,7 +120,7 @@ static func run(game) -> Dictionary:
 		var candidates: Array = []
 		for item in pattern:
 			candidates.append(director.make_actor(item[0], item[1], director.spawn_distance + float(item[2])))
-		for speed_value in [2.7, 5.4, 9.0, 12.0, 14.4]:
+		for speed_value in Director.CHECK_SPEEDS:
 			for lane_id in range(5):
 				if not director.has_route(candidates, 0.0, lane_id, speed_value, Vector2(5.0, 0.32)):
 					all_patterns_safe = false
@@ -136,11 +137,12 @@ static func run(game) -> Dictionary:
 		director.step(0.5, tick * 0.5 + 5.0, tick * 4.0, 3, Vector2(5.0, 0.32))
 		maximum_count = maxi(maximum_count, director.actors.size())
 	checks["seeded_director_bounded"] = maximum_count <= director.maximum_actors and director.accepted > 0
-	checks["minimum_warning_time"] = (960.0 - 240.0) / 12.0 / (14.4 + 12.0) > 1.5
+	checks["minimum_warning_time"] = (960.0 - 240.0) / 12.0 / (21.6 + 12.0) > 1.5
 	checks["spawns_full_bus_offscreen"] = 240.0 + director.spawn_distance * 12.0 - 85.0 > 960.0
 	director.free()
 	game.start_run()
 	game.traffic.enabled = false
+	game.food.enabled = false
 	var transitions: int = 0
 	var was_recovering: bool = false
 	var smooth: bool = true
@@ -152,9 +154,9 @@ static func run(game) -> Dictionary:
 		if game.rider.recovering != was_recovering: transitions += 1
 		was_recovering = game.rider.recovering
 		if game.state == game.RunState.SUCCESS: break
-	checks["automatic_energy_cycles"] = transitions >= 10
-	checks["smooth_acceleration"] = smooth
-	checks["three_minute_commute"] = game.elapsed > 160 and game.elapsed < 200 and game.distance == 1500.0
+	checks["no_passive_energy_cycles"] = transitions == 0
+	checks["fixed_cruise_speed"] = game.rider.speed >= 14.4
+	checks["updated_commute_duration"] = game.elapsed > 95 and game.elapsed < 106 and game.distance == 1500.0
 	checks["university_success"] = game.state == game.RunState.SUCCESS
 	var finish_time: float = game.elapsed
 	game.simulate(1.0)
@@ -182,13 +184,8 @@ static func run(game) -> Dictionary:
 	game.simulate(1.0/60.0)
 	checks["collision_after_arrival_ignored"] = game.state == game.RunState.SUCCESS
 	game.start_run()
-	game.rider.energy = 20.0
-	game.rider.recovering = true
-	game.wind.elapsed = 13.0
-	game.traffic.actors.append(game.traffic.make_actor("cyclist",3,9.0))
-	for i in 30: game.simulate(1.0/60.0)
-	checks["draft_recovers_energy"] = game.rider.energy > 25.9 and game.rider.sheltered
-	game.start_run()
+	checks.merge(load("res://tests/cycling/energy_checks.gd").run(game))
+	game.food.enabled = true
 	game.traffic.enabled = true
 	game.set_physics_process(true)
 	return checks
