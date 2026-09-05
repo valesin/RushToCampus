@@ -133,3 +133,36 @@ func go_to_menu() -> void:
 	lives_changed.emit(lives)
 	coins_changed.emit(coins)
 	get_tree().change_scene_to_file("res://scenes/MainMenu.tscn")
+
+# Cycling session state survives menu, run and result scenes.
+const CyclingResults = preload("res://scripts/cycling/results_store.gd")
+var cycling_clean_theme: bool = true
+var cycling_auto_start: bool = false
+var cycling_last_result: Dictionary = {}
+var cycling_best_distance: float = 0.0
+var cycling_score_path: String = CyclingResults.PATH
+var cycling_transition_pending: bool = false
+
+func start_cycling() -> void:
+	if cycling_transition_pending: return
+	cycling_auto_start = true
+	cycling_change_scene("res://scenes/cycling/CyclingGame.tscn")
+
+func cycling_change_scene(path: String) -> void:
+	if cycling_transition_pending: return
+	cycling_transition_pending = true
+	_finish_cycling_transition.call_deferred(path)
+
+func _finish_cycling_transition(path: String) -> void:
+	var error: Error = get_tree().change_scene_to_file(path)
+	cycling_transition_pending = false
+	if error != OK: push_error("Could not open cycling screen: " + path)
+
+func record_cycling_result(result: Dictionary) -> void:
+	cycling_last_result = result.duplicate(true)
+	cycling_best_distance = maxf(cycling_best_distance, float(result.best))
+	cycling_change_scene("res://scenes/WinScreen.tscn" if result.won else "res://scenes/GameOver.tscn")
+
+func cycling_menu() -> void:
+	cycling_auto_start = false
+	cycling_change_scene("res://scenes/MainMenu.tscn")

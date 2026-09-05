@@ -1,9 +1,8 @@
-[gd_scene format=3 uid="uid://m1u2jwdlbr2"]
+[gd_scene load_steps=2 format=3]
 
-[ext_resource type="Script" uid="uid://b6o1d0ykgym0s" path="res://scripts/main_menu.gd" id="1"]
-[ext_resource type="Texture2D" uid="uid://du45jv1vn4pm5" path="res://assets/sprites/splash.png" id="2"]
+[ext_resource type="Script" path="res://scripts/rush_screen.gd" id="1"]
 
-[node name="MainMenu" type="Control" unique_id=1382099884]
+[node name="MainMenu" type="Control"]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -11,57 +10,3 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1")
-
-[node name="BG" type="TextureRect" parent="." unique_id=802516886]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 375.0
-offset_top = 261.0
-offset_right = 375.0
-offset_bottom = 261.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-texture = ExtResource("2")
-expand_mode = 1
-stretch_mode = 6
-
-[node name="Center" type="CenterContainer" parent="." unique_id=1158923597]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 383.0
-offset_top = 262.0
-offset_right = 383.0
-offset_bottom = 262.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-
-[node name="Box" type="VBoxContainer" parent="Center" unique_id=1146087534]
-layout_mode = 2
-theme_override_constants/separation = 16
-alignment = 1
-
-[node name="Title" type="Label" parent="Center/Box" unique_id=1162743909]
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 1, 1, 1)
-text = "Platformer Template"
-horizontal_alignment = 1
-
-[node name="Gap" type="Control" parent="Center/Box" unique_id=1885939138]
-custom_minimum_size = Vector2(0, 28)
-layout_mode = 2
-
-[node name="StartButton" type="Button" parent="Center/Box" unique_id=199201917]
-layout_mode = 2
-size_flags_horizontal = 4
-text = "Start Game"
-
-[node name="QuitButton" type="Button" parent="Center/Box" unique_id=834100962]
-layout_mode = 2
-size_flags_horizontal = 4
-text = "Quit"

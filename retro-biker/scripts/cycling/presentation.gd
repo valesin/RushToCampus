@@ -86,7 +86,7 @@ func _ready() -> void:
 	theme_button.pressed.connect(toggle_theme)
 	theme_button.visible = false
 	layers[5].add_child(theme_button)
-	set_clean_theme(true)
+	set_clean_theme(GameManager.cycling_clean_theme)
 
 func toggle_theme() -> void:
 	if game.state != game.RunState.PAUSED: return
@@ -95,6 +95,7 @@ func toggle_theme() -> void:
 
 func set_clean_theme(enabled: bool) -> void:
 	clean_theme = enabled
+	GameManager.cycling_clean_theme = enabled
 	for i in [2,3,4]: layers[i].material = clean_material if enabled else original_materials[i]
 	theme_button.text = "LOOK: COLOURFUL  /  Switch to Illustrated" if enabled else "LOOK: ILLUSTRATED  /  Switch to Colourful"
 	for layer in layers: layer.queue_redraw()
@@ -298,7 +299,7 @@ func draw_overlay(c: Node2D) -> void:
 		game.RunState.PAUSED:
 			title = "TAKE A BREATHER"
 			detail = "Distance, traffic, energy and wind are paused."
-			action = "ENTER / SPACE / ESC  RESUME"
+			action = "J / ENTER / SPACE / L / ESC  RESUME"
 		game.RunState.RESULTS:
 			title = "END OF THE ROAD"
 			detail = "%d m ridden / Best %d m" % [int(game.distance),int(game.best_distance)]
@@ -310,11 +311,11 @@ func draw_overlay(c: Node2D) -> void:
 	text(c,Vector2(200,180),title,28,GOLD)
 	text(c,Vector2(200,221),detail,19)
 	text(c,Vector2(200,261),"UP / DOWN or W / S — switch lanes",19)
-	text(c,Vector2(200,298),"K / B: 2s boost · costs 20. At zero: 2s recovery.",17,MUTED)
+	text(c,Vector2(200,298),"K: 2s boost · costs 20. At zero: 2s recovery.",17,MUTED)
 	text(c,Vector2(200,325),"Rugbrød +20 · Danish +30 · Draft restores +5 energy/s",15,MUTED)
 	text(c,Vector2(200,350),action,20,GOLD)
 	if game.state != game.RunState.PAUSED:
-		text(c,Vector2(200,389),"Click game to focus  |  Handheld: A start / C pause",14,MUTED)
+		text(c,Vector2(200,389),"Click game to focus  |  J start / L pause",14,MUTED)
 	if game.score_write_error:
 		text(c,Vector2(200,408),"Best score could not be saved.",13,MUTED)
 
@@ -357,3 +358,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			if game.state == game.RunState.RUNNING: game.state = game.RunState.PAUSED
 			elif game.state == game.RunState.PAUSED: game.state = game.RunState.RUNNING
 			get_viewport().set_input_as_handled()
+
+func _input(event: InputEvent) -> void:
+	if game.state != game.RunState.PAUSED or event.is_echo(): return
+	if event.is_action_pressed("cycling_up") or event.is_action_pressed("cycling_down"):
+		theme_button.grab_focus()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("cycling_confirm") and theme_button.has_focus():
+		toggle_theme()
+		get_viewport().set_input_as_handled()

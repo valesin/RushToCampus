@@ -10,9 +10,10 @@ config_version=5
 
 [application]
 
+; Keep the existing application ID so user:// best scores retain their storage location.
 config/name="Platform Quest"
-config/description="A grid-based sidescrolling platformer template for Summer Engine."
-run/main_scene="res://scenes/cycling/CyclingGame.tscn"
+config/description="Ride through Copenhagen to campus."
+run/main_scene="res://scenes/MainMenu.tscn"
 config/features=PackedStringArray("4.7")
 run/max_fps=60.0
 

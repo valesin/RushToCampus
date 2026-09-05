@@ -9,8 +9,10 @@ var feedback: String = ""
 var feedback_left: float = 0.0
 var enabled: bool = true
 var deferred_opportunities: int = 0
+var collected: int = 0
 
 func reset() -> void:
+	collected = 0
 	items.clear()
 	rng.seed = 20260906
 	next_bread = rng.randf_range(6.0, 6.5)
@@ -67,6 +69,7 @@ func step(delta: float, game) -> void:
 		var end := Vector2(item.distance - game.distance, item.lane - game.rider.lane_position)
 		if Actor.swept_contact(start, end, Vector2(3.5, 0.30)):
 			game.rider.add_food(item.amount)
+			collected += 1
 			feedback = ("RUGBRØD +20" if item.kind == "bread" else "DANISH +30")
 			feedback_left = 1.6
 			items.remove_at(i)
