@@ -26,6 +26,7 @@ Sfx="*res://scripts/sfx.gd"
 window/size/viewport_width=960.0
 window/size/viewport_height=540.0
 window/stretch/mode="viewport"
+window/stretch/aspect="keep"
 
 [dotnet]
 
