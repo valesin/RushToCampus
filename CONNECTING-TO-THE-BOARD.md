@@ -42,6 +42,11 @@ When it's time to ship a build:
 The board's controls are a joystick and three buttons, labeled **A**, **B**, and **C**.
 That's the entire input surface for the game — no keyboard, no mouse, no extra buttons.
 
+## Related notes
+
+- Starting / rebooting the game: `BOARD-BOOT.md`
+- Black screen while the game is running: `BOARD-SCREEN-WAKE.md`
+
 ## What not to do
 
 - Don't run `adb`, `docker`, or board commands by hand — ask Claude to do it through the
