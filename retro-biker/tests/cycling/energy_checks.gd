@@ -98,13 +98,16 @@ static func run(game) -> Dictionary:
 	c.bread_schedule = game.food.next_bread >= 6.0 and game.food.next_bread <= 8.0
 	c.pastry_schedule = game.food.next_pastry >= 18.0 and game.food.next_pastry <= 24.0
 	c.safe_bread_spawn = game.food.spawn_food("bread",game)
-	var hazard = game.traffic.make_actor("car",3,90.0)
+	# The lane is drawn by weight, so aim the hazard at wherever it actually landed.
+	var placed: Dictionary = game.food.items[game.food.items.size()-1]
+	var hazard = game.traffic.make_actor("car",placed["lane"],placed["distance"])
 	c.future_hazard_rejected = not game.food.traffic_clear([hazard],0.0)
 	game.start_run()
-	game.traffic.actors.append(game.traffic.make_actor("barrier",3,48.0))
-	game.traffic.actors.append(game.traffic.make_actor("barrier",4,48.0))
-	for lane_id in [3,4]:
-		for at in [24.0,32.0,64.0,80.0,96.0]: game.traffic.actors.append(game.traffic.make_actor("barrier",lane_id,at))
+	# Block every candidate slot in every lane, derived from the spawner's own
+	# offsets so the fixture cannot drift out of date.
+	for lane_id in range(5):
+		for step_ahead in game.food.AHEAD_STEPS:
+			game.traffic.actors.append(game.traffic.make_actor("barrier",lane_id,game.food.minimum_ahead(game)+step_ahead))
 	c.unsafe_pickup_rejected = not game.food.spawn_food("bread",game)
 	game.start_run()
 	game.rider.energy = 0.0

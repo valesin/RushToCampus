@@ -1,12 +1,26 @@
 extends Node
 const Actor = preload("res://scripts/cycling/traffic_actor.gd")
 const Definition = preload("res://scripts/cycling/traffic_definition.gd")
+const Layout = preload("res://scripts/cycling/presentation_layout.gd")
+## Fastest closing traffic (car); with boost speed it bounds the approach rate.
+const MAX_ONCOMING_SPEED: float = 12.0
 @export var seed_value: int = 20260905
 @export var maximum_actors: int = 24
-@export var spawn_distance: float = 78.0
+@export var spawn_distance: float = 118.0
+## Seconds an actor is simulated offscreen before its art can enter the frame.
+@export var spawn_lead_seconds: float = 1.5
 @export var safe_start_seconds: float = 5.0
 @export var initial_interval: float = 5.0
-@export var final_interval: float = 2.8
+@export var final_interval: float = 2.2
+## A rejected pattern retries shortly instead of forfeiting its whole slot,
+## which would otherwise swallow the density ramp.
+@export var retry_seconds: float = 1.0
+## Extra clearance folded into every route check. Shrinks with route progress,
+## so identical traffic demands better timing near university. The route
+## guarantee itself never relaxes; only the comfort inside it does.
+const MARGIN_START := Vector2(1.0, 0.15)
+const MARGIN_END := Vector2(0.5, 0.075)
+var contact_margin: Vector2 = MARGIN_START
 var food
 const CHECK_SPEEDS: Array[float] = [3.6, 7.2, 7.8, 10.8, 14.4, 15.84, 21.6]
 var actors: Array = []
@@ -36,8 +50,15 @@ func reset() -> void:
 	actors.clear()
 	rng.seed = seed_value
 	next_spawn = safe_start_seconds
+	contact_margin = MARGIN_START
 	accepted = 0
 	rejected = 0
+
+## Spawn gap that keeps every actor offscreen for spawn_lead_seconds even when
+## the rider boosts into oncoming traffic. Guards the projection against a
+## pixels_per_metre change silently pulling spawns back into the frame.
+func minimum_spawn_distance(pixels_per_metre: float, top_rider_speed: float) -> float:
+	return Layout.art_horizon(pixels_per_metre)+(top_rider_speed+MAX_ONCOMING_SPEED)*spawn_lead_seconds
 
 func make_actor(kind: String, lane_id: int, at_distance: float):
 	var spec = Definition.new()
@@ -63,7 +84,13 @@ func make_actor(kind: String, lane_id: int, at_distance: float):
 	actor.configure(spec, at_distance)
 	return actor
 
-func step(delta: float, elapsed: float, rider_distance: float, rider_lane: int, rider_size: Vector2) -> void:
+## progress is the fraction of the route covered, not elapsed time, so a
+## boosting rider cannot outrun their own difficulty curve.
+func step(delta: float, elapsed: float, rider_distance: float, rider_lane: int, rider_size: Vector2, progress: float = 0.0) -> void:
+	var ramp: float = clampf(progress, 0.0, 1.0)
+	# Set before any route check this frame, including the pickup corridors
+	# food_director validates through has_route.
+	contact_margin = MARGIN_START.lerp(MARGIN_END, ramp)
 	for actor in actors:
 		actor.step(delta)
 	for i in range(actors.size() - 1, -1, -1):
@@ -75,13 +102,17 @@ func step(delta: float, elapsed: float, rider_distance: float, rider_lane: int, 
 			pool.append(old)
 	if not enabled or elapsed < next_spawn:
 		return
-	next_spawn = elapsed + lerpf(initial_interval, final_interval, clampf(elapsed / 120.0, 0.0, 1.0))
+	next_spawn = elapsed + lerpf(initial_interval, final_interval, ramp)
 	var pattern: Array = PATTERNS[rng.randi_range(0, PATTERNS.size() - 1)]
 	if actors.size() + pattern.size() > maximum_actors:
+		next_spawn = elapsed + retry_seconds
 		return
 	var candidate: Array = []
 	for item in pattern:
-		candidate.append(make_actor(item[0], item[1], rider_distance + spawn_distance + float(item[2])))
+		var gap: float = spawn_distance + float(item[2])
+		var actor = make_actor(item[0], item[1], rider_distance + gap)
+		actor.spawn_gap = gap
+		candidate.append(actor)
 	var combined: Array = actors + candidate
 	# Conservative checks at exhausted/headwind, calm, and full/tailwind speeds.
 	# Runtime movement is continuous; graph edges use the same swept hit test.
@@ -104,6 +135,7 @@ func step(delta: float, elapsed: float, rider_distance: float, rider_lane: int, 
 	else:
 		pool.append_array(candidate)
 		rejected += 1
+		next_spawn = elapsed + retry_seconds
 
 func has_route(candidates: Array, rider_distance: float, rider_lane: int, speed_value: float, rider_size: Vector2, pickup_distance: float = -1.0, pickup_lane: int = -1) -> bool:
 	var reachable: Array[int] = [rider_lane]
@@ -122,7 +154,7 @@ func has_route(candidates: Array, rider_distance: float, rider_lane: int, speed_
 					var end := Vector2(actor.distance - rider_distance + (actor.definition.speed - speed_value) * t1, actor.definition.lane - lane_to)
 					var half: Vector2 = (actor.definition.contact_size + rider_size) * 0.5
 					# Extra margin covers smooth lane interpolation and human timing.
-					half += Vector2(1.0, 0.15)
+					half += contact_margin
 					if Actor.swept_contact(start, end, half):
 						safe = false
 						break

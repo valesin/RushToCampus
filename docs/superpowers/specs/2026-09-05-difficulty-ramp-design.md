@@ -73,6 +73,8 @@ Live actors stay under `maximum_actors`.
 
 **The realized pickup distribution will be less top-heavy than the weights suggest.** The risky lanes are also the most frequently blocked: `corridor_clear` pads each hazard by `8.0 + contact_size.x * 0.5`, which is 14.5 m for a bus, and a bus sweeps roughly 240 m backward over the approach horizon. Nearly any bus within 240 m ahead vetoes a lane-0 pickup. The weights express a preference, not an outcome.
 
+*Measured after implementation: this prediction was too pessimistic. The realized distribution across lanes 0 to 4 was 6/3/6/2/0, so 15 of 17 pickups landed in the exposed vehicle lanes. See `retro-biker/tests/cycling/README.md`.*
+
 **Pickup availability should hold up despite that**, because the weighted shuffle falls back to lanes 3 and 4 at the same distance step. Only the lane changes, not the success rate. This is the main risk to the energy economy and must be measured, since rugbrød is the primary energy source.
 
 **Risky-lane pickups get accepted more often late in the route**, when margins are tighter and traffic is densest. More temptation into the bus lane exactly as the bus lane gets worse.

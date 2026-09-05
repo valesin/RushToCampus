@@ -1,6 +1,18 @@
 extends Node
 ## Pickups reserve a clear approach and exit corridor against current AND future traffic.
 const Actor = preload("res://scripts/cycling/traffic_actor.gd")
+const Layout = preload("res://scripts/cycling/presentation_layout.gd")
+## Longitudinal fallbacks, measured out from the offscreen minimum. They stay
+## nearer than the traffic spawn band so a fresh vehicle cannot immediately
+## invalidate the reserved corridor.
+const AHEAD_STEPS: Array[float] = [0.0, 8.0, 16.0, 24.0, 32.0]
+## Lane preference, most exposed lane first, so collecting a pickup is usually a
+## decision about crossing traffic rather than a free grab in the bike lane.
+const LANE_WEIGHTS: Array[float] = [5.0, 4.0, 3.0, 2.0, 1.0]
+## Danishes lean harder into the exposed lanes than rugbrød does.
+const LANE_BIAS: Dictionary = {"bread": 1.0, "pastry": 2.0}
+## Seconds a pickup sits offscreen before it can enter the frame.
+@export var spawn_lead_seconds: float = 0.6
 var items: Array[Dictionary] = []
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var next_bread: float = 7.0
@@ -35,15 +47,44 @@ func traffic_clear(candidates: Array, rider_distance: float) -> bool:
 		if not corridor_clear(item, candidates, rider_distance): return false
 	return true
 
+## Nearest gap that still keeps a pickup outside the frame while the rider
+## boosts towards it, so it is placed and reserved before it is ever visible.
+func minimum_ahead(game) -> float:
+	return Layout.art_horizon(game.pixels_per_metre)+game.rider.BOOST_SPEED*spawn_lead_seconds
+
+## Weighted sample without replacement. Returns every lane in preference order
+## so a blocked corridor falls back to a safer lane instead of losing the
+## pickup outright.
+func lane_order(kind: String) -> Array:
+	var remaining: Array = [0, 1, 2, 3, 4]
+	var bias: float = LANE_BIAS.get(kind, 1.0)
+	var weights: Array = []
+	for lane_id in remaining:
+		weights.append(pow(LANE_WEIGHTS[lane_id], bias))
+	var order: Array = []
+	while not remaining.is_empty():
+		var total: float = 0.0
+		for weight in weights: total += weight
+		var roll: float = rng.randf() * total
+		var index: int = 0
+		while index < remaining.size() - 1 and roll > weights[index]:
+			roll -= weights[index]
+			index += 1
+		order.append(remaining[index])
+		remaining.remove_at(index)
+		weights.remove_at(index)
+	return order
+
 func spawn_food(kind: String, game) -> bool:
-	var lanes: Array = [3, 4] if kind == "bread" else [2, 1]
+	var lanes: Array = lane_order(kind)
 	# Vary longitudinal placement when traffic occupies the default approach.
-	# A close fallback needs at most two lane changes; never move hazards.
-	for ahead in [48.0, 32.0, 64.0, 24.0, 80.0, 96.0]:
+	# Nearest offscreen slot first; never move hazards.
+	var nearest: float = minimum_ahead(game)
+	for step_ahead in AHEAD_STEPS:
+		var ahead: float = nearest + step_ahead
 		for lane_id in lanes:
-			if ahead < 32.0 and absi(game.rider.lane-lane_id) > 2: continue
 			var item: Dictionary = {"kind":kind, "lane":lane_id, "distance":game.distance + ahead,
-				"amount":20.0 if kind == "bread" else 30.0}
+				"amount":20.0 if kind == "bread" else 30.0, "spawn_gap":ahead}
 			if item.distance > game.route_length - 12.0: continue
 			var separated: bool = true
 			for existing in items:

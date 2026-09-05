@@ -35,6 +35,10 @@ func _ready() -> void:
 	add_child(traffic)
 	add_child(food)
 	traffic.food = food
+	# The frame width, not the authored value, has the final say on how early
+	# traffic has to exist.
+	traffic.spawn_distance = maxf(traffic.spawn_distance,
+		traffic.minimum_spawn_distance(pixels_per_metre, RiderScript.BOOST_SPEED))
 	presentation = PresentationScript.new()
 	presentation.name = "Presentation"
 	presentation.game = self
@@ -122,7 +126,7 @@ func simulate(delta: float) -> void:
 		wind.elapsed -= delta - travel_delta
 		rider.lane_position = lerpf(rider.previous_lane_position, rider.lane_position, travel_delta / delta)
 	distance += rider.speed * travel_delta
-	traffic.step(travel_delta, elapsed, distance, rider.lane, rider.contact_size)
+	traffic.step(travel_delta, elapsed, distance, rider.lane, rider.contact_size, distance / maxf(route_length, 0.01))
 	for actor in traffic.actors:
 		var start := Vector2(actor.previous_distance - previous_distance, actor.definition.lane - rider.previous_lane_position)
 		var end := Vector2(actor.distance - distance, actor.definition.lane - rider.lane_position)

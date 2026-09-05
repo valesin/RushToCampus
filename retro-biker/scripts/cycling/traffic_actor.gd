@@ -3,6 +3,9 @@ var definition: Resource
 var distance: float = 0.0
 var previous_distance: float = 0.0
 var encountered: bool = false
+## Gap ahead of the rider this actor was placed at. Spawners keep it beyond the
+## frame, so nothing is ever created inside the player's field of view.
+var spawn_gap: float = 0.0
 var audio_generation: int = 0
 var bell_played: bool = false
 var visual: Node2D

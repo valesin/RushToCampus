@@ -4,6 +4,7 @@ const Run = preload("res://scripts/cycling/run_controller.gd")
 const Rider = preload("res://scripts/cycling/rider.gd")
 const Wind = preload("res://scripts/cycling/wind_controller.gd")
 const Director = preload("res://scripts/cycling/traffic_director.gd")
+const Layout = preload("res://scripts/cycling/presentation_layout.gd")
 
 static func run(game) -> Dictionary:
 	var checks: Dictionary = {}
@@ -116,15 +117,23 @@ static func run(game) -> Dictionary:
 
 	var director = Director.new()
 	var all_patterns_safe: bool = true
-	for pattern in director.PATTERNS:
-		var candidates: Array = []
-		for item in pattern:
-			candidates.append(director.make_actor(item[0], item[1], director.spawn_distance + float(item[2])))
-		for speed_value in Director.CHECK_SPEEDS:
-			for lane_id in range(5):
-				if not director.has_route(candidates, 0.0, lane_id, speed_value, Vector2(5.0, 0.32)):
-					all_patterns_safe = false
+	var hardest_patterns_safe: bool = true
+	# The route guarantee must hold at both ends of the ramp: shrinking the
+	# comfort margin may never make an authored pattern unsurvivable.
+	for margin in [Director.MARGIN_START, Director.MARGIN_END]:
+		director.contact_margin = margin
+		for pattern in director.PATTERNS:
+			var candidates: Array = []
+			for item in pattern:
+				candidates.append(director.make_actor(item[0], item[1], director.spawn_distance + float(item[2])))
+			for speed_value in Director.CHECK_SPEEDS:
+				for lane_id in range(5):
+					if not director.has_route(candidates, 0.0, lane_id, speed_value, Vector2(5.0, 0.32)):
+						if margin == Director.MARGIN_START: all_patterns_safe = false
+						else: hardest_patterns_safe = false
+	director.contact_margin = Director.MARGIN_START
 	checks["all_patterns_all_lanes_speed_extremes"] = all_patterns_safe
+	checks["all_patterns_safe_at_max_difficulty"] = hardest_patterns_safe
 	var wall: Array = []
 	for lane_id in range(5):
 		wall.append(director.make_actor("barrier", lane_id, 8.0))
@@ -137,9 +146,69 @@ static func run(game) -> Dictionary:
 		director.step(0.5, tick * 0.5 + 5.0, tick * 4.0, 3, Vector2(5.0, 0.32))
 		maximum_count = maxi(maximum_count, director.actors.size())
 	checks["seeded_director_bounded"] = maximum_count <= director.maximum_actors and director.accepted > 0
-	checks["minimum_warning_time"] = (960.0 - 240.0) / 12.0 / (21.6 + 12.0) > 1.5
-	checks["spawns_full_bus_offscreen"] = 240.0 + director.spawn_distance * 12.0 - 85.0 > 960.0
+	var horizon: float = Layout.art_horizon(12.0)
+	checks["minimum_warning_time"] = Layout.view_ahead(12.0) / (21.6 + 12.0) > 1.5
+	checks["spawns_full_bus_offscreen"] = director.spawn_distance > horizon
+	checks["traffic_spawn_lead_time"] = (director.spawn_distance - horizon) / (21.6 + 12.0) >= director.spawn_lead_seconds
+
+	# Ramp endpoints: the opening must feel exactly as it does today, and the
+	# finish must land on the floor with no overshoot in between.
+	director.reset()
+	director.step(0.0, 0.0, 0.0, 3, Vector2(5.0, 0.32), 0.0)
+	checks["margin_unchanged_at_start"] = director.contact_margin == Director.MARGIN_START
+	director.step(0.0, 0.0, 0.0, 3, Vector2(5.0, 0.32), 1.0)
+	checks["margin_floor_at_finish"] = director.contact_margin == Director.MARGIN_END
+	var margin_monotonic: bool = true
+	var previous_margin: float = INF
+	for sample in 21:
+		director.step(0.0, 0.0, 0.0, 3, Vector2(5.0, 0.32), float(sample) / 20.0)
+		if director.contact_margin.x > previous_margin + 0.0001: margin_monotonic = false
+		previous_margin = director.contact_margin.x
+	checks["margin_never_grows"] = margin_monotonic
+	checks["interval_tightens_over_route"] = director.final_interval < director.initial_interval and director.final_interval <= 2.2
+
+	# A rejected pattern retries instead of forfeiting the whole slot.
+	director.reset()
+	for lane_id in range(5):
+		director.actors.append(director.make_actor("barrier", lane_id, 8.0))
+	director.next_spawn = 6.0
+	director.step(0.0, 6.0, 0.0, 3, Vector2(5.0, 0.32), 0.0)
+	checks["rejected_pattern_retries"] = director.rejected > 0 and absf(director.next_spawn - (6.0 + director.retry_seconds)) < 0.001
 	director.free()
+
+	# Drive both spawners over a seeded stretch and record the narrowest gap any
+	# entity was ever created at. Collision handling is bypassed so the ride
+	# continues past hazards a real player would have to steer around.
+	game.start_run()
+	game.set_physics_process(false)
+	game.traffic.enabled = true
+	game.food.enabled = true
+	var narrowest_traffic: float = INF
+	var narrowest_food: float = INF
+	var peak_actors: int = 0
+	var pickup_lanes: Array = [0, 0, 0, 0, 0]
+	for tick in 7000:
+		game.previous_distance = game.distance
+		game.distance += 14.4 / 60.0
+		game.elapsed += 1.0 / 60.0
+		game.traffic.step(1.0 / 60.0, game.elapsed, game.distance, game.rider.lane, game.rider.contact_size,
+			game.distance / game.route_length)
+		var before_items: int = game.food.items.size()
+		game.food.step(1.0 / 60.0, game)
+		for actor in game.traffic.actors:
+			narrowest_traffic = minf(narrowest_traffic, actor.spawn_gap)
+		peak_actors = maxi(peak_actors, game.traffic.actors.size())
+		for item in game.food.items:
+			narrowest_food = minf(narrowest_food, item["spawn_gap"])
+		for i in range(before_items, game.food.items.size()):
+			pickup_lanes[game.food.items[i]["lane"]] += 1
+		if game.distance >= game.route_length: break
+	checks["seeded_run_spawned_both"] = is_finite(narrowest_traffic) and is_finite(narrowest_food)
+	checks["traffic_never_spawns_in_view"] = narrowest_traffic > horizon
+	checks["food_never_spawns_in_view"] = narrowest_food > horizon
+	checks["actors_bounded_at_max_difficulty"] = peak_actors <= game.traffic.maximum_actors
+	# Pickups must reach the exposed lanes, not stay parked in the bike lane.
+	checks["pickups_reach_exposed_lanes"] = pickup_lanes[0] + pickup_lanes[1] + pickup_lanes[2] > 0
 	game.start_run()
 	game.traffic.enabled = false
 	game.food.enabled = false
