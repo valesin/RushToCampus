@@ -6,6 +6,7 @@ func _initialize() -> void:
 func key(code: Key, down: bool) -> void:
 	var event := InputEventKey.new()
 	event.keycode = code
+	event.physical_keycode = code
 	event.pressed = down
 	Input.parse_input_event(event)
 	Input.flush_buffered_events()
