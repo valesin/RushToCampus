@@ -24,6 +24,9 @@ const MARGIN_END := Vector2(0.5, 0.075)
 var contact_margin: Vector2 = MARGIN_START
 var food
 const CHECK_SPEEDS: Array[float] = [3.6, 7.2, 7.8, 10.8, 14.4, 15.84, 21.6]
+## Slack on the route search's per-step actor filter, in metres. Comfortably
+## above the float32 rounding inside swept_contact, far below a contact size.
+const ROUTE_FILTER_EPSILON: float = 0.001
 var actors: Array = []
 var pool: Array = []
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
@@ -157,21 +160,53 @@ func has_route(candidates: Array, rider_distance: float, rider_lane: int, speed_
 	var reachable: Array[int] = [rider_lane]
 	var dt: float = 0.20 # slightly slower than actual lane transition: safety margin
 	var pickup_time: float = (pickup_distance - rider_distance) / speed_value
+	# Per-actor values that the tick and lane loops cannot change, lifted out of
+	# them. Reading them back through actor.definition once per lane pair per
+	# tick, as this search used to, is most of what it spends its time on.
+	var count: int = candidates.size()
+	var offsets := PackedFloat64Array()
+	var closing := PackedFloat64Array()
+	var lanes := PackedFloat64Array()
+	offsets.resize(count)
+	closing.resize(count)
+	lanes.resize(count)
+	var halves: Array[Vector2] = []
+	halves.resize(count)
+	for i in count:
+		var actor = candidates[i]
+		var definition = actor.definition
+		offsets[i] = actor.distance - rider_distance
+		closing[i] = definition.speed - speed_value
+		lanes[i] = definition.lane
+		var half: Vector2 = (definition.contact_size + rider_size) * 0.5
+		# Extra margin covers smooth lane interpolation and human timing.
+		half += contact_margin
+		halves[i] = half
+	var near: Array[int] = []
 	for tick in range(maxi(90, int(ceil(pickup_time / dt)) + 10)):
 		var t0: float = tick * dt
 		var t1: float = t0 + dt
+		# swept_contact is a slab test, so an actor whose x span already misses
+		# the rider's box across this step cannot contact it whichever lanes are
+		# tried. The lane pair never moves that x span, so this runs once per
+		# tick instead of once per lane pair, and the epsilon keeps it a superset
+		# of the exact test it stands in for.
+		near.clear()
+		for i in count:
+			var from_x: float = offsets[i] + closing[i] * t0
+			var to_x: float = offsets[i] + closing[i] * t1
+			var reach: float = halves[i].x + ROUTE_FILTER_EPSILON
+			if minf(from_x, to_x) - reach <= 0.0 and maxf(from_x, to_x) + reach >= 0.0:
+				near.append(i)
 		var following: Array[int] = []
 		for lane_from in reachable:
 			for lane_to in range(maxi(0, lane_from - 1), mini(4, lane_from + 1) + 1):
 				if pickup_lane >= 0 and t0 <= pickup_time and t1 > pickup_time and (lane_from != pickup_lane or lane_to != pickup_lane): continue
 				var safe: bool = true
-				for actor in candidates:
-					var start := Vector2(actor.distance - rider_distance + (actor.definition.speed - speed_value) * t0, actor.definition.lane - lane_from)
-					var end := Vector2(actor.distance - rider_distance + (actor.definition.speed - speed_value) * t1, actor.definition.lane - lane_to)
-					var half: Vector2 = (actor.definition.contact_size + rider_size) * 0.5
-					# Extra margin covers smooth lane interpolation and human timing.
-					half += contact_margin
-					if Actor.swept_contact(start, end, half):
+				for i in near:
+					var start := Vector2(offsets[i] + closing[i] * t0, lanes[i] - lane_from)
+					var end := Vector2(offsets[i] + closing[i] * t1, lanes[i] - lane_to)
+					if Actor.swept_contact(start, end, halves[i]):
 						safe = false
 						break
 				if safe and not following.has(lane_to):
