@@ -47,7 +47,7 @@ func run_checks() -> void:
 	await frames(4)
 	var view = game.presentation
 	var sound = game.cycling_audio
-	checks.default_original = not view.clean_theme
+	checks.default_colourful = view.clean_theme
 	checks.assets_loaded = view.clean_art.city != null and view.clean_art.materials != null and view.clean_art.details != null and view.clean_art.frames.size() == 2
 	checks.shared_75_25 = view.Layout.CITY_HEIGHT == 135 and view.Layout.LANE_HEIGHT == 81
 	checks.all_audio_loaded = sound.streams.size() == 14
@@ -57,18 +57,18 @@ func run_checks() -> void:
 	checks.start = game.state == game.RunState.RUNNING
 	checks.toggle_hidden_running = not view.theme_button.visible
 	view.toggle_theme()
-	checks.no_switch_outside_pause = not view.clean_theme
+	checks.no_switch_outside_pause = view.clean_theme
 	await tap(KEY_K)
 	await tap(KEY_ESCAPE)
 	var snapshot: Array = [game.distance,game.elapsed,game.rider.energy,game.rider.boost_left,game.rider.lane_position]
 	await click_toggle()
-	checks.pause_button_switch = view.clean_theme and game.state == game.RunState.PAUSED
+	checks.pause_button_switch = not view.clean_theme and game.state == game.RunState.PAUSED
 	checks.run_preserved_on_switch = snapshot == [game.distance,game.elapsed,game.rider.energy,game.rider.boost_left,game.rider.lane_position]
 	checks.hud_unchanged = view.layers[5].material == null
 	checks.paused_audio = sound.cycling_pov.stream_paused
-	await capture("pause-colourful")
+	await capture("pause-illustrated")
 	await tap(KEY_ENTER)
-	checks.resume = game.state == game.RunState.RUNNING and view.clean_theme
+	checks.resume = game.state == game.RunState.RUNNING and not view.clean_theme
 	await tap(KEY_UP)
 	await frames(16)
 	checks.lane_change_audio = sound.lane_change_count == 1 and game.rider.lane == 2
@@ -79,7 +79,7 @@ func run_checks() -> void:
 	key(KEY_DOWN,false)
 	await tap(KEY_ESCAPE)
 	await click_toggle()
-	checks.switch_back = not view.clean_theme and view.layers[3].material == view.original_materials[3]
+	checks.switch_back = view.clean_theme and view.layers[3].material == view.clean_material
 	await click_toggle()
 	await tap(KEY_ENTER)
 	sound.hit(false)
@@ -87,7 +87,7 @@ func run_checks() -> void:
 	sound.hit(true)
 	checks.major_impact_new = sound.impact.stream == sound.streams.crash and not sound.cycling_pov.playing
 	game.start_run()
-	checks.restart_keeps_theme = view.clean_theme and sound.lane_change_count == 0
+	checks.restart_keeps_theme = not view.clean_theme and sound.lane_change_count == 0
 	game.set_physics_process(false)
 	game.traffic.enabled = false
 	game.food.enabled = false
@@ -95,6 +95,7 @@ func run_checks() -> void:
 		game.traffic.actors.append(game.traffic.make_actor(item[0],item[1],item[2]))
 	game.food.items.append({"kind":"bread","lane":3,"distance":16.0,"amount":20.0})
 	game.food.items.append({"kind":"pastry","lane":2,"distance":30.0,"amount":30.0})
+	view.set_clean_theme(true)
 	await capture("staged-colourful")
 	view.debug_contacts = true
 	await capture("staged-colourful-contacts")

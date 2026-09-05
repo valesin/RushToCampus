@@ -5,7 +5,7 @@ const Districts = preload("res://scripts/cycling/districts.gd")
 const CleanTheme = preload("res://scripts/cycling/clean_theme.gd")
 const Layout = preload("res://scripts/cycling/presentation_layout.gd")
 var game
-var clean_theme: bool = false
+var clean_theme: bool = true
 var clean_art: RefCounted
 var theme_button: Button
 var original_materials: Dictionary = {}
@@ -86,6 +86,7 @@ func _ready() -> void:
 	theme_button.pressed.connect(toggle_theme)
 	theme_button.visible = false
 	layers[5].add_child(theme_button)
+	set_clean_theme(true)
 
 func toggle_theme() -> void:
 	if game.state != game.RunState.PAUSED: return

@@ -1,6 +1,6 @@
 # Alternative theme and Windows stability
 
-Pause and click LOOK to switch Illustrated / Colourful. Same run, HUD, controls, audio, actor sizes and collision dimensions. Selection survives restarting a run within the session and defaults to Illustrated on a fresh launch.
+Pause and click LOOK to switch Illustrated / Colourful. Same run, HUD, controls, audio, actor sizes and collision dimensions. Selection survives restarting a run within the session and defaults to Colourful on a fresh launch.
 
 Latest approved layout supersedes the earlier 85/15 specification: city 135px (25%), five equal 81px bands (75%). Both themes use presentation_layout.gd. Wider district crops show Copenhagen rooftops and landmarks. Horizontal gameplay stays X=240 and 12 pixels/metre.
 
