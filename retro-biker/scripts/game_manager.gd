@@ -7,6 +7,8 @@ signal coins_changed(coins: int)
 
 const MAX_LIVES := 3
 const GAME_OVER_DELAY := 1.7   # let the death play out before the Game Over screen
+const CYCLING_SCENE := "res://scenes/cycling/CyclingGame.tscn"
+const CYCLING_BEST_PATH := "user://cycling_best.json"
 
 var level_files := [
 	"res://levels/level_01.txt",
@@ -18,6 +20,14 @@ var current_level := 0
 var lives := MAX_LIVES
 var _game_over_pending := false
 var coins := 0
+
+# Cycling run summary for Rush start / win / game-over screens.
+var cycling_best_distance: float = 0.0
+var cycling_last_distance: float = 0.0
+var cycling_last_food: int = 0
+var cycling_last_elapsed: float = 0.0
+var cycling_new_record: bool = false
+var cycling_auto_start: bool = true
 
 # --- Music. Lives on this autoload so it survives scene changes; switching only
 # happens when the requested track differs, so level->level keeps playing. ---
@@ -34,6 +44,7 @@ func _ready() -> void:
 	_menu_stream = _load_loop("res://assets/audio/music_level.mp3")
 	_game_stream = _load_loop("res://assets/audio/music_game.mp3")
 	_boss_stream = _load_loop("res://assets/audio/music_boss.mp3")
+	cycling_best_distance = read_cycling_best()
 
 func _load_loop(path: String) -> AudioStream:
 	if not ResourceLoader.exists(path):
@@ -115,8 +126,7 @@ func next_level() -> void:
 	else:
 		get_tree().reload_current_scene()
 
-# Starts a fresh run from level 1. Called by Main Menu "Start" and end-screen
-# "Retry" / "Play Again".
+# Starts a fresh platformer run from level 1.
 func reset_game() -> void:
 	current_level = 0
 	lives = MAX_LIVES
@@ -125,6 +135,37 @@ func reset_game() -> void:
 	coins_changed.emit(coins)
 	get_tree().change_scene_to_file("res://scenes/Level.tscn")
 
+# Boot the Copenhagen cycling run from Rush menus.
+func start_cycling() -> void:
+	cycling_auto_start = true
+	get_tree().change_scene_to_file(CYCLING_SCENE)
+
+func record_cycling_result(won: bool, distance: float, food: int, elapsed: float, best: float, new_record: bool) -> void:
+	cycling_last_distance = distance
+	cycling_last_food = food
+	cycling_last_elapsed = elapsed
+	cycling_best_distance = best
+	cycling_new_record = new_record
+	var path: String = "res://scenes/WinScreen.tscn" if won else "res://scenes/GameOver.tscn"
+	get_tree().change_scene_to_file(path)
+
+func read_cycling_best() -> float:
+	if not FileAccess.file_exists(CYCLING_BEST_PATH):
+		return 0.0
+	var file := FileAccess.open(CYCLING_BEST_PATH, FileAccess.READ)
+	if file == null:
+		return 0.0
+	var parser := JSON.new()
+	if parser.parse(file.get_as_text()) != OK:
+		return 0.0
+	var parsed = parser.data
+	if not parsed is Dictionary:
+		return 0.0
+	var value = parsed.get("best_distance", 0.0)
+	if not (value is float or value is int):
+		return 0.0
+	return maxf(0.0, float(value)) if is_finite(float(value)) else 0.0
+
 # Returns to the main menu. Called by the end-screen "Main Menu" button.
 func go_to_menu() -> void:
 	current_level = 0
@@ -132,4 +173,5 @@ func go_to_menu() -> void:
 	coins = 0
 	lives_changed.emit(lives)
 	coins_changed.emit(coins)
+	cycling_best_distance = read_cycling_best()
 	get_tree().change_scene_to_file("res://scenes/MainMenu.tscn")

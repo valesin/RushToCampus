@@ -1,9 +1,9 @@
-[gd_scene format=3 uid="uid://m1u2jwdlbr2"]
+[gd_scene load_steps=3 format=3 uid="uid://m1u2jwdlbr2"]
 
-[ext_resource type="Script" uid="uid://b6o1d0ykgym0s" path="res://scripts/main_menu.gd" id="1"]
-[ext_resource type="Texture2D" uid="uid://du45jv1vn4pm5" path="res://assets/sprites/splash.png" id="2"]
+[ext_resource type="Script" path="res://scripts/main_menu.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/ui/screen_start.jpg" id="2"]
 
-[node name="MainMenu" type="Control" unique_id=1382099884]
+[node name="MainMenu" type="Control"]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -12,15 +12,11 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1")
 
-[node name="BG" type="TextureRect" parent="." unique_id=802516886]
+[node name="BG" type="TextureRect" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 375.0
-offset_top = 261.0
-offset_right = 375.0
-offset_bottom = 261.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
@@ -28,40 +24,83 @@ texture = ExtResource("2")
 expand_mode = 1
 stretch_mode = 6
 
-[node name="Center" type="CenterContainer" parent="." unique_id=1158923597]
+[node name="BestBadge" type="PanelContainer" parent="."]
 layout_mode = 1
-anchors_preset = 15
+anchors_preset = 1
+anchor_left = 1.0
 anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 383.0
-offset_top = 262.0
-offset_right = 383.0
-offset_bottom = 262.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
+offset_left = -248.0
+offset_top = 14.0
+offset_right = -18.0
+offset_bottom = 52.0
+grow_horizontal = 0
 
-[node name="Box" type="VBoxContainer" parent="Center" unique_id=1146087534]
+[node name="BestLabel" type="Label" parent="BestBadge"]
 layout_mode = 2
-theme_override_constants/separation = 16
-alignment = 1
-
-[node name="Title" type="Label" parent="Center/Box" unique_id=1162743909]
-layout_mode = 2
-theme_override_colors/font_color = Color(1, 1, 1, 1)
-text = "Platformer Template"
+text = "Best Distance: 0 m"
 horizontal_alignment = 1
 
-[node name="Gap" type="Control" parent="Center/Box" unique_id=1885939138]
-custom_minimum_size = Vector2(0, 28)
-layout_mode = 2
+[node name="StartButton" type="Button" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -175.0
+offset_top = 8.0
+offset_right = 175.0
+offset_bottom = 72.0
+grow_horizontal = 2
+grow_vertical = 2
+text = ""
 
-[node name="StartButton" type="Button" parent="Center/Box" unique_id=199201917]
+[node name="HowButton" type="Button" parent="."]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -120.0
+offset_top = -68.0
+offset_right = 120.0
+offset_bottom = -22.0
+grow_horizontal = 2
+grow_vertical = 0
+text = ""
+
+[node name="HowPanel" type="PanelContainer" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -250.0
+offset_top = -160.0
+offset_right = 250.0
+offset_bottom = 160.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="HowBox" type="VBoxContainer" parent="HowPanel"]
+layout_mode = 2
+theme_override_constants/separation = 12
+alignment = 1
+
+[node name="HowTitle" type="Label" parent="HowPanel/HowBox"]
+layout_mode = 2
+text = "HOW TO PLAY"
+horizontal_alignment = 1
+
+[node name="HowBody" type="Label" parent="HowPanel/HowBox"]
+layout_mode = 2
+text = "W/S or ↑/↓ — change lanes\nK / B — boost (costs energy)\nDraft behind traffic to block headwind\nPick up rugbrød (+20) and danish (+30)\nReach university at 1.5 km"
+horizontal_alignment = 1
+
+[node name="CloseHow" type="Button" parent="HowPanel/HowBox"]
 layout_mode = 2
 size_flags_horizontal = 4
-text = "Start Game"
-
-[node name="QuitButton" type="Button" parent="Center/Box" unique_id=834100962]
-layout_mode = 2
-size_flags_horizontal = 4
-text = "Quit"
+text = "GOT IT"

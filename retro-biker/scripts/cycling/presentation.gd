@@ -225,6 +225,8 @@ func draw_overlay(c: Node2D) -> void:
 	if game.state == game.RunState.CRASHED:
 		c.draw_rect(Rect2(0,0,960,540),Color(0.65,0.2,0.12,0.18))
 		return
+	if game.state == game.RunState.RESULTS or game.state == game.RunState.SUCCESS:
+		return
 	c.draw_rect(Rect2(0,Layout.CITY_HEIGHT,960,540-Layout.CITY_HEIGHT),Color(0.06,0.1,0.11,0.65))
 	c.draw_rect(Rect2(165,130,630,285),Color("#293638"))
 	c.draw_rect(Rect2(165,130,630,285),GOLD,false,2)
@@ -236,14 +238,8 @@ func draw_overlay(c: Node2D) -> void:
 			title = "TAKE A BREATHER"
 			detail = "Distance, traffic, energy and wind are paused."
 			action = "ENTER / SPACE / ESC  RESUME"
-		game.RunState.RESULTS:
-			title = "END OF THE ROAD"
-			detail = "%d m ridden / Best %d m" % [int(game.distance),int(game.best_distance)]
-			action = "ENTER / SPACE  TRY AGAIN"
-		game.RunState.SUCCESS:
-			title = "MADE IT TO UNIVERSITY!"
-			detail = "1.5 km in %d:%02d. You made it to class." % [int(game.elapsed)/60,int(game.elapsed)%60]
-			action = "ENTER / SPACE  RIDE AGAIN"
+		game.RunState.READY:
+			pass
 	text(c,Vector2(200,180),title,28,GOLD)
 	text(c,Vector2(200,221),detail,19)
 	text(c,Vector2(200,261),"UP / DOWN or W / S — switch lanes",19)

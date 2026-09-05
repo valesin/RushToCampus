@@ -1,0 +1,7 @@
+---
+description: Deploy a Summer Engine game to an Arduino Uno Q over USB
+alwaysApply: false
+---
+
+To put the game on the board, follow /Users/vishals/summer-uno-q/SKILL.md exactly, including the
+scripts in /Users/vishals/summer-uno-q/board/. Do not improvise adb or docker commands.
