@@ -1,0 +1,177 @@
+{
+  "sources": [
+    {
+      "name": "freewheel",
+      "download": "https://cdn.freesound.org/previews/494/494328_470543-hq.mp3",
+      "author": "stib",
+      "source": "https://freesound.org/people/stib/sounds/494328/",
+      "license": "CC0-1.0"
+    },
+    {
+      "name": "bell",
+      "download": "https://cdn.freesound.org/previews/330/330956_2436991-hq.mp3",
+      "author": "nikiforov5000",
+      "source": "https://freesound.org/people/nikiforov5000/sounds/330956/",
+      "license": "CC0-1.0"
+    },
+    {
+      "name": "car",
+      "download": "https://cdn.freesound.org/previews/244/244407_4474028-hq.mp3",
+      "author": "961_Studios",
+      "source": "https://freesound.org/people/961_Studios/sounds/244407/",
+      "license": "CC0-1.0"
+    },
+    {
+      "name": "bus",
+      "download": "https://cdn.freesound.org/previews/138/138247_2531318-hq.mp3",
+      "author": "Hupguy",
+      "source": "https://freesound.org/people/Hupguy/sounds/138247/",
+      "license": "CC0-1.0"
+    },
+    {
+      "name": "street",
+      "download": "https://cdn.freesound.org/previews/236/236946_108786-hq.mp3",
+      "author": "Matmorfus",
+      "source": "https://freesound.org/people/Matmorfus/sounds/236946/",
+      "license": "CC0-1.0"
+    },
+    {
+      "name": "wind",
+      "download": "https://cdn.freesound.org/previews/475/475448_7009965-hq.mp3",
+      "author": "o_ciz",
+      "source": "https://freesound.org/people/o_ciz/sounds/475448/",
+      "license": "CC0-1.0"
+    },
+    {
+      "name": "birds",
+      "download": "https://cdn.freesound.org/previews/493/493936_108786-hq.mp3",
+      "author": "Matmorfus",
+      "source": "https://freesound.org/people/Matmorfus/sounds/493936/",
+      "license": "CC0-1.0"
+    }
+  ],
+  "edits": [
+    {
+      "file": "waterfront.ogg",
+      "source": "birds",
+      "start_seconds": 20,
+      "excerpt_seconds": 30,
+      "filters": "highpass=f=250,lowpass=f=7000",
+      "loop": true,
+      "encoded_seconds": 29.8,
+      "source_peak": 0.0500994473695755,
+      "peak_target_dbfs": -5.04
+    },
+    {
+      "file": "campus.ogg",
+      "source": "birds",
+      "start_seconds": 95,
+      "excerpt_seconds": 30,
+      "filters": "highpass=f=400,lowpass=f=7000",
+      "loop": true,
+      "encoded_seconds": 29.8,
+      "source_peak": 0.08714714646339417,
+      "peak_target_dbfs": -5.04
+    },
+    {
+      "file": "street.ogg",
+      "source": "street",
+      "start_seconds": 35,
+      "excerpt_seconds": 30,
+      "filters": "highpass=f=90,lowpass=f=400",
+      "loop": true,
+      "encoded_seconds": 29.8,
+      "source_peak": 0.21784885227680206,
+      "peak_target_dbfs": -5.04
+    },
+    {
+      "file": "wind.ogg",
+      "source": "wind",
+      "start_seconds": 25,
+      "excerpt_seconds": 12,
+      "filters": "highpass=f=170,lowpass=f=3500",
+      "loop": true,
+      "encoded_seconds": 11.8,
+      "source_peak": 0.008443107828497887,
+      "peak_target_dbfs": -5.04
+    },
+    {
+      "file": "tyres.ogg",
+      "source": "wind",
+      "start_seconds": 70,
+      "excerpt_seconds": 8,
+      "filters": "highpass=f=650,lowpass=f=2200",
+      "loop": true,
+      "encoded_seconds": 7.8,
+      "source_peak": 0.005267899017781019,
+      "peak_target_dbfs": -5.04
+    },
+    {
+      "file": "chain.ogg",
+      "source": "freewheel",
+      "start_seconds": 3,
+      "excerpt_seconds": 3,
+      "filters": "highpass=f=350,lowpass=f=5500",
+      "loop": true,
+      "encoded_seconds": 2.8,
+      "source_peak": 0.10441775619983673,
+      "peak_target_dbfs": -5.04
+    },
+    {
+      "file": "freewheel.ogg",
+      "source": "freewheel",
+      "start_seconds": 7,
+      "excerpt_seconds": 4,
+      "filters": "highpass=f=300,lowpass=f=5500",
+      "loop": true,
+      "encoded_seconds": 3.8,
+      "source_peak": 0.07604117691516876,
+      "peak_target_dbfs": -5.04
+    },
+    {
+      "file": "car.ogg",
+      "source": "car",
+      "start_seconds": 2,
+      "excerpt_seconds": 2,
+      "filters": "highpass=f=150,lowpass=f=6000",
+      "loop": true,
+      "encoded_seconds": 1.8,
+      "source_peak": 0.22443093359470367,
+      "peak_target_dbfs": -5.04
+    },
+    {
+      "file": "bus.ogg",
+      "source": "bus",
+      "start_seconds": 7,
+      "excerpt_seconds": 3,
+      "filters": "highpass=f=130,lowpass=f=5000",
+      "loop": true,
+      "encoded_seconds": 2.8,
+      "source_peak": 0.08433494716882706,
+      "peak_target_dbfs": -5.04
+    },
+    {
+      "file": "bell.ogg",
+      "source": "bell",
+      "start_seconds": 0,
+      "excerpt_seconds": 2,
+      "filters": "highpass=f=550,lowpass=f=6500",
+      "loop": false,
+      "encoded_seconds": 2.0,
+      "source_peak": 0.2950666844844818,
+      "peak_target_dbfs": -5.04
+    },
+    {
+      "file": "bump.ogg",
+      "source": "freewheel",
+      "start_seconds": 1,
+      "excerpt_seconds": 0.3,
+      "filters": "asetrate=22050,aresample=44100,highpass=f=120,lowpass=f=2400",
+      "loop": false,
+      "encoded_seconds": 0.3,
+      "source_peak": 0.03062536008656025,
+      "peak_target_dbfs": -5.04
+    }
+  ],
+  "note": "CC0 high-quality MP3 previews. Tyres, chain and bump are edited foley derivatives, not separate literal recordings. Street lowpass intentionally suppresses speech detail. Perceptual listening audit remains required."
+}

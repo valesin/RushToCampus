@@ -3,9 +3,13 @@ var definition: Resource
 var distance: float = 0.0
 var previous_distance: float = 0.0
 var encountered: bool = false
+var audio_generation: int = 0
+var bell_played: bool = false
 var visual: Node2D
 
 func configure(spec: Resource, at_distance: float) -> void:
+	audio_generation += 1
+	bell_played = false
 	definition = spec
 	distance = at_distance
 	previous_distance = distance

@@ -1,9 +1,14 @@
 extends Node2D
-## Prototype presentation. Replace visuals independently of collision definitions.
+## Three independent canvases: city/road, keyed traffic, unkeyed interface.
+const Layer = preload("res://scripts/cycling/presentation_layer.gd")
+const Districts = preload("res://scripts/cycling/districts.gd")
+const CityDetails = preload("res://scripts/cycling/city_details.gd")
 var game
 var font: Font = ThemeDB.fallback_font
 var city_texture: Texture2D
 var atlas_frames: Array[Texture2D] = []
+var layers: Array[Node2D] = []
+var render_distance: float = 0.0
 const REGIONS: Dictionary = {
 	"player": Rect2(106, 90, 350, 365),
 	"cyclist": Rect2(583, 91, 359, 365),
@@ -12,221 +17,182 @@ const REGIONS: Dictionary = {
 	"pedestrian": Rect2(754, 548, 200, 325),
 	"barrier": Rect2(1076, 607, 382, 257)
 }
-const ART_WIDTHS: Dictionary = {"player": 58.0, "cyclist": 58.0, "car": 60.0, "bus": 112.0, "pedestrian": 29.0, "barrier": 37.0}
 
-func _ready() -> void:
-	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	city_texture = load("res://assets/cycling/copenhagen-buildings.png")
-	for path in ["res://assets/cycling/traffic-frame-1.png", "res://assets/cycling/traffic-frame-2.png"]:
-		var texture := load(path) as Texture2D
-		if texture != null:
-			atlas_frames.append(texture)
-	if atlas_frames.size() != 2:
-		atlas_frames.clear()
-	var key_material := ShaderMaterial.new()
-	key_material.shader = load("res://scripts/cycling/chroma_key.gdshader")
-	material = key_material
-
-func sprite_art(kind: String, at: Vector2) -> void:
-	if atlas_frames.is_empty():
-		return
-	var region: Rect2 = REGIONS[kind]
-	var width: float = ART_WIDTHS[kind]
-	var height: float = width * region.size.y / region.size.x
-	var frame: int = int(game.elapsed * (4.0 if kind in ["player", "cyclist", "pedestrian"] else 2.0)) % 2
-	draw_texture_rect_region(atlas_frames[frame], Rect2(at - Vector2(width / 2.0, height), Vector2(width, height)), region)
-
+const ART_WIDTHS: Dictionary = {"player":82.0,"cyclist":82.0,"car":110.0,"bus":170.0,"pedestrian":40.0,"barrier":55.0}
+const LANE_Y: Array[float] = [244.0,314.0,384.0,454.0,524.0]
 const INK := Color("#eee4cd")
 const MUTED := Color("#b6b3a4")
 const GOLD := Color("#dfb552")
 const GREEN := Color("#a9c495")
-const LANE_Y: Array[float] = [273.0, 330.0, 387.0, 444.0, 510.0]
-const LABELS: Array[String] = ["BUS", "CAR", "CAR", "BIKE", "WALK"]
-const BUILDINGS: Array[Color] = [Color("#9e7758"), Color("#b59461"), Color("#637c83"), Color("#aa7053"), Color("#b4a486"), Color("#8b9389")]
+const LABELS: Array[String] = ["BUS","CAR","CAR","BIKE","WALK"]
+const CITY_REGIONS: Array[Rect2] = [Rect2(0,0,1536,300),Rect2(0,300,1536,260),Rect2(0,560,1536,220),Rect2(0,780,1536,244)]
 
-func text(at: Vector2, message: String, size: int = 16, tint: Color = INK) -> void:
-	draw_string(font, at, message, HORIZONTAL_ALIGNMENT_LEFT, -1.0, size, tint)
+func _ready() -> void:
+	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	var original := load("res://assets/cycling/city-districts.png") as Texture2D
+	if original:
+		var pixels := original.get_image()
+		pixels.generate_mipmaps()
+		city_texture = ImageTexture.create_from_image(pixels)
+	for path in ["res://assets/cycling/traffic-frame-1.png","res://assets/cycling/traffic-frame-2.png"]:
+		var texture := load(path) as Texture2D
+		if texture:
+			atlas_frames.append(texture)
+	for i in 3:
+		var layer := Layer.new()
+		layer.host = self
+		layer.layer_id = i
+		add_child(layer)
+		layers.append(layer)
+	var key_material := ShaderMaterial.new()
+	key_material.shader = load("res://scripts/cycling/chroma_key.gdshader")
+	layers[1].material = key_material
+
+func _process(_delta: float) -> void:
+	render_distance = game.distance
+	if game.state == game.RunState.RUNNING:
+		render_distance = lerpf(game.previous_distance, game.distance, clampf(Engine.get_physics_interpolation_fraction(),0.0,1.0))
+	for layer in layers:
+		layer.queue_redraw()
+
+func text(c: Node2D, at: Vector2, message: String, size: int = 18, tint: Color = INK) -> void:
+	c.draw_string(font, at, message, HORIZONTAL_ALIGNMENT_LEFT, -1.0, size, tint)
 
 func lane_y(value: float) -> float:
-	var low: int = clampi(int(floor(value)), 0, 4)
-	return lerpf(LANE_Y[low], LANE_Y[mini(4, low + 1)], value - low)
+	return LANE_Y[0] + clampf(value,0.0,4.0)*70.0
 
-func _draw() -> void:
-	if game == null:
-		return
-	draw_rect(Rect2(0, 0, 960, 540), Color("#a6aba6"))
-	_draw_city()
-	_draw_road()
-	# Render in lane order; lower contact points correctly overlap upper sprites.
-	for lane_id in range(5):
-		for actor in game.traffic.actors:
-			if actor.definition.lane == lane_id:
-				_draw_actor(actor)
-		if int(round(game.rider.lane_position)) == lane_id:
-			_draw_player()
-	_draw_hud()
-	_draw_overlay()
+func district(tile: int) -> int:
+	return Districts.visual_district(tile)
 
-func _draw_city() -> void:
-	if city_texture != null:
-		var width: float = 720.0
-		var offset: float = fposmod(game.distance * 1.6, width)
-		for tile in range(-1, 3):
-			var rect := Rect2(tile * width - offset, 66, width, 166)
-			draw_texture_rect(city_texture, rect, false)
-		draw_rect(Rect2(0, 225, 960, 8), Color("#535951"))
-		return
-	draw_rect(Rect2(0, 66, 960, 160), Color("#b7bab2"))
-	for cloud in range(5):
-		var x: float = fposmod(cloud * 237.0 - game.distance * 0.3, 1200.0) - 120.0
-		draw_circle(Vector2(x, 91), 46, Color("#c7c8be"))
-		draw_circle(Vector2(x + 48, 98), 40, Color("#c7c8be"))
-	var offset: float = fposmod(game.distance * 1.6, 92.0)
-	for i in range(-1, 12):
-		var x: float = i * 92.0 - offset
-		var h: float = 85.0 + (posmod(i, 4) * 13.0)
-		var top: float = 226.0 - h
-		draw_rect(Rect2(x + 2, top, 88, h), BUILDINGS[posmod(i, BUILDINGS.size())])
-		draw_colored_polygon(PackedVector2Array([Vector2(x, top), Vector2(x + 46, top - 25), Vector2(x + 92, top)]), Color("#54554c"))
-		for row in range(3):
-			for col in range(4):
-				var p := Vector2(x + 10 + col * 20, top + 12 + row * 24)
-				draw_rect(Rect2(p, Vector2(10, 15)), Color("#ded7bf"))
-				draw_rect(Rect2(p + Vector2(2, 2), Vector2(6, 11)), Color("#4c6164"))
-		draw_rect(Rect2(x + 10, 207, 67, 17), Color("#55584b"))
-		text(Vector2(x + 15, 220), ["KAFFE", "CYKLER", "BAGERI"][posmod(i, 3)], 11)
-	draw_rect(Rect2(0, 225, 960, 8), Color("#535951"))
+func render_layer(c: Node2D, layer_id: int) -> void:
+	match layer_id:
+		0: draw_world(c)
+		1: draw_traffic(c)
+		2:
+			draw_hud(c)
+			draw_overlay(c)
 
-func _draw_road() -> void:
-	var colors: Array[Color] = [Color("#55564f"), Color("#484c49"), Color("#51534d"), Color("#995f4b"), Color("#9c998b")]
-	for i in range(5):
-		var top: float = 233.0 + i * 58.0
-		draw_rect(Rect2(0, top, 960, 58 if i < 4 else 75), colors[i])
-		draw_line(Vector2(0, top), Vector2(960, top), Color("#c2b9a1"), 2)
-		text(Vector2(15, top + 35), LABELS[i], 16, Color("#c8bda2"))
-		var offset: float = fposmod(game.distance * game.pixels_per_metre, 96.0)
-		for dash in range(-1, 12):
-			var x: float = dash * 96.0 - offset
-			if i < 4:
-				draw_line(Vector2(x, top + 54), Vector2(x + 40, top + 54), Color("#b4a98b"), 2)
+func draw_world(c: Node2D) -> void:
+	c.draw_rect(Rect2(0,0,960,540),Color("#aab4b1"))
+	# Sky moves at 5% of road velocity; global indices keep cloud identity stable.
+	var sky_scroll: float = render_distance * game.pixels_per_metre * 0.05
+	var cloud_first: int = int(floor(sky_scroll/240.0))
+	for i in range(cloud_first,cloud_first+6):
+		var x: float = i*240.0-sky_scroll
+		c.draw_circle(Vector2(x,84),35,Color("#c2c8be"))
+		c.draw_circle(Vector2(x+43,90),44,Color("#c2c8be"))
+	if city_texture:
+		var city_scroll: float = render_distance * game.pixels_per_metre * 0.25
+		var first: int = int(floor(city_scroll/720.0))
+		for tile in range(first,first+3):
+			var left: float = tile*720.0-city_scroll
+			var region: Rect2 = CITY_REGIONS[district(tile)]
+			c.draw_texture_rect_region(city_texture,Rect2(left,70,720,120),region)
+	c.draw_rect(Rect2(0,186,960,4),Color("#72776c"))
+	var colors: Array[Color] = [Color("#55564f"),Color("#484c49"),Color("#51534d"),Color("#995f4b"),Color("#9c998b")]
+	var road_scroll: float = render_distance * game.pixels_per_metre
+	var dash_first: int = int(floor(road_scroll/96.0))
+	for lane_id in 5:
+		var top: float = 190.0+lane_id*70.0
+		c.draw_rect(Rect2(0,top,960,70),colors[lane_id])
+		c.draw_line(Vector2(0,top),Vector2(960,top),Color("#c2b9a1"),2)
+		text(c,Vector2(12,top+43),LABELS[lane_id],18,Color("#c8bda2"))
+		for dash in range(dash_first,dash_first+12):
+			var x: float = dash*96.0-road_scroll
+			if lane_id < 4:
+				c.draw_line(Vector2(x,top+67),Vector2(x+40,top+67),Color("#b4a98b"),2)
 			else:
-				draw_line(Vector2(x, top), Vector2(x - 10, 540), Color("#827e70"), 1)
-				draw_line(Vector2(0, 521), Vector2(960, 521), Color("#827e70"), 1)
+				c.draw_line(Vector2(x,top),Vector2(x-10,540),Color("#827e70"),1)
+	# Roadside planters move with the road, but stay out of the playable lanes.
+	var prop_first: int = int(floor(road_scroll/360.0))
+	for i in range(prop_first,prop_first+4):
+		var x: float = i*360.0-road_scroll
+		c.draw_rect(Rect2(x,178,30,10),Color("#665d49"))
+		c.draw_circle(Vector2(x+15,171),12,Color("#6e8064"))
+	CityDetails.draw(c,self)
+	for sign_distance in [1000.0,1300.0]:
+		var x: float = 240.0+(sign_distance-render_distance)*game.pixels_per_metre
+		if x > -160 and x < 1120:
+			c.draw_line(Vector2(x,140),Vector2(x,189),MUTED,3)
+			c.draw_rect(Rect2(x-84,115,168,30),Color("#344a47"))
+			text(c,Vector2(x-77,136),"UNIVERSITET "+str(int(game.route_length-sign_distance))+" m →",14)
 
-func _draw_player() -> void:
-	var x: float = 240.0
-	var y: float = lane_y(game.rider.lane_position)
-	if game.rider.sheltered:
-		draw_colored_polygon(PackedVector2Array([Vector2(x - 30, y - 8), Vector2(x + 72, y - 8), Vector2(x + 72, y - 45), Vector2(x - 30, y - 30)]), Color(0.66, 0.8, 0.57, 0.20))
-	if game.rider.cooldown_left <= 0.0 or int(game.elapsed * 14.0) % 2 == 0:
-		sprite_art("player", Vector2(x, y))
-	draw_line(Vector2(x, y + 5), Vector2(x + 20, y + 5), GOLD, 3)
+func sprite_art(c: Node2D, kind: String, at: Vector2, phase: float) -> void:
+	if atlas_frames.size() != 2: return
+	var region: Rect2 = REGIONS[kind]
+	var width: float = ART_WIDTHS[kind]
+	var height: float = width*region.size.y/region.size.x
+	c.draw_texture_rect_region(atlas_frames[int(phase)%2],Rect2(at-Vector2(width/2.0,height),Vector2(width,height)),region)
 
-func _draw_actor(actor) -> void:
-	var x: float = 240.0 + (actor.distance - game.distance) * game.pixels_per_metre
-	var y: float = lane_y(float(actor.definition.lane))
-	if actor.definition.visual_scene != null:
-		if not is_instance_valid(actor.visual):
-			actor.visual = actor.definition.visual_scene.instantiate()
-			add_child(actor.visual)
-		actor.visual.position = Vector2(x, y)
-		return
-	if not atlas_frames.is_empty():
-		sprite_art(actor.definition.kind, Vector2(x, y))
-		return
-	match actor.definition.kind:
-		"cyclist":
-			draw_bike(Vector2(x, y), GREEN, false)
-		"pedestrian":
-			draw_circle(Vector2(x, y - 35), 6, Color("#d3bba0"))
-			draw_line(Vector2(x, y - 27), Vector2(x, y - 13), Color("#3e5661"), 12)
-			draw_line(Vector2(x, y - 13), Vector2(x - 10, y), INK, 3)
-			draw_line(Vector2(x, y - 13), Vector2(x + 7, y), INK, 3)
-			text(Vector2(x - 11, y - 47), "<", 15)
-		"barrier":
-			draw_rect(Rect2(x - 16, y - 29, 32, 20), Color("#d3c4a7"))
-			for k in range(3):
-				draw_line(Vector2(x - 13 + k * 11, y - 11), Vector2(x - 5 + k * 11, y - 27), Color("#ae593f"), 5)
-			draw_line(Vector2(x - 13, y - 10), Vector2(x - 13, y), INK, 3)
-			draw_line(Vector2(x + 13, y - 10), Vector2(x + 13, y), INK, 3)
-		_:
-			var is_bus: bool = actor.definition.kind == "bus"
-			var width: float = 108.0 if is_bus else 52.0
-			var height: float = 43.0 if is_bus else 27.0
-			var tint: Color = GOLD if is_bus else Color("#91a0a0")
-			draw_rect(Rect2(x - width / 2, y - height, width, height - 6), tint)
-			draw_rect(Rect2(x - width / 2 + 4, y - height + 4, width - 8, 13), Color("#34454a"))
-			draw_circle(Vector2(x - width * 0.32, y - 5), 7, Color("#272e2e"))
-			draw_circle(Vector2(x + width * 0.32, y - 5), 7, Color("#272e2e"))
-			draw_line(Vector2(x - width / 2, y - 13), Vector2(x - width / 2 + 3, y - 13), INK, 4)
-			text(Vector2(x - 9, y - height - 5), "<", 16)
-			if is_bus:
-				text(Vector2(x - 15, y - 12), "5A", 12, Color("#34372f"))
+func draw_traffic(c: Node2D) -> void:
+	var items: Array = []
+	for actor in game.traffic.actors:
+		items.append({"y":lane_y(actor.definition.lane),"actor":actor})
+	items.append({"y":lane_y(game.rider.lane_position),"actor":null})
+	items.sort_custom(func(a,b): return a.y < b.y)
+	for item in items:
+		var actor = item.actor
+		if actor == null:
+			var at := Vector2(240,item.y)
+			if game.rider.sheltered:
+				c.draw_colored_polygon(PackedVector2Array([at+Vector2(-42,-5),at+Vector2(95,-5),at+Vector2(95,-52),at+Vector2(-42,-22)]),Color(0.66,0.8,0.57,0.2))
+			if game.rider.cooldown_left <= 0 or int(game.elapsed*14)%2 == 0:
+				sprite_art(c,"player",at,game.rider.animation_phase)
+			c.draw_line(at+Vector2(-25,4),at+Vector2(25,4),GOLD,3)
+		else:
+			var x: float = 240.0+(actor.distance-render_distance)*game.pixels_per_metre
+			if actor.definition.visual_scene != null:
+				if not is_instance_valid(actor.visual):
+					actor.visual = actor.definition.visual_scene.instantiate()
+					layers[1].add_child(actor.visual)
+				actor.visual.position = Vector2(x,item.y)
+			else:
+				var cadence: float = absf(actor.definition.speed)/12.0*6.0 if actor.definition.kind == "cyclist" else 4.0 if actor.definition.kind == "pedestrian" else 2.0
+				sprite_art(c,actor.definition.kind,Vector2(x,item.y),game.elapsed*cadence)
 
-func draw_bike(at: Vector2, jacket: Color, player: bool) -> void:
-	var rear: Vector2 = at + Vector2(-18, -10)
-	var front: Vector2 = at + Vector2(19, -10)
-	for wheel in [rear, front]:
-		draw_circle(wheel, 10, Color("#303735"))
-		draw_arc(wheel, 9, 0, TAU, 20, INK, 1.4)
-		var spin: float = game.distance * 2.0
-		draw_line(wheel - Vector2(cos(spin), sin(spin)) * 8, wheel + Vector2(cos(spin), sin(spin)) * 8, MUTED, 1)
-	var pedal: Vector2 = at + Vector2(-1, -10)
-	var saddle: Vector2 = at + Vector2(-8, -24)
-	var handle: Vector2 = at + Vector2(12, -28)
-	draw_polyline(PackedVector2Array([rear, saddle, pedal, rear, handle, front, pedal, handle]), jacket, 2)
-	draw_line(saddle + Vector2(-5, 0), saddle + Vector2(5, 0), INK, 3)
-	draw_line(handle, handle + Vector2(7, -3), INK, 2)
-	draw_line(at + Vector2(-9, -33), at + Vector2(-1, -45), jacket, 10)
-	draw_circle(at + Vector2(4, -51), 5, Color("#d8bda0"))
-	draw_line(at + Vector2(-1, -43), handle, jacket, 4)
-	draw_line(at + Vector2(-8, -30), at + Vector2(2, -22), Color("#303f44"), 5)
-	draw_line(at + Vector2(2, -22), pedal, Color("#303f44"), 4)
-	if player:
-		draw_rect(Rect2(at + Vector2(-18, -44), Vector2(8, 15)), Color("#4c5144"))
+func draw_hud(c: Node2D) -> void:
+	c.draw_rect(Rect2(0,0,960,70),Color("#2a3637"))
+	text(c,Vector2(18,25),"LATE FOR LECTURE",19,GOLD)
+	text(c,Vector2(18,54),"UNIVERSITY / 1.5 KM",14,MUTED)
+	text(c,Vector2(275,27),"%d m LEFT" % int(ceil(maxf(0,game.route_length-game.distance))),24)
+	text(c,Vector2(275,54),"%d:%02d  /  %d km/h" % [int(game.elapsed)/60,int(game.elapsed)%60,int(game.rider.speed*3.6)],16,MUTED)
+	text(c,Vector2(505,24),"ENERGY %d%% %s" % [int(game.rider.energy),"↑" if game.rider.energy_change>0 else "↓"],17)
+	c.draw_rect(Rect2(505,36,165,12),Color("#58605a"))
+	c.draw_rect(Rect2(505,36,165*game.rider.energy/100.0,12),GREEN if game.rider.recovering else GOLD)
+	var effort: String = "SHELTERED" if game.rider.sheltered else "RECOVERING" if game.rider.recovering else "PEDALLING"
+	text(c,Vector2(700,25),effort,19,GREEN if game.rider.recovering or game.rider.sheltered else GOLD)
+	text(c,Vector2(700,53),game.wind.warning() if game.wind.warning() != "" else game.wind.phase(),13,MUTED)
+	c.draw_rect(Rect2(0,67,960*clampf(game.distance/game.route_length,0,1),3),GOLD)
 
-func _draw_hud() -> void:
-	draw_rect(Rect2(0, 0, 960, 66), Color("#2a3637"))
-	text(Vector2(20, 24), "LATE FOR LECTURE", 17, GOLD)
-	text(Vector2(20, 48), "COPENHAGEN / ENDLESS COMMUTE", 11, MUTED)
-	text(Vector2(285, 25), "%04d m" % int(game.distance), 23)
-	text(Vector2(286, 48), "BEST  %d m" % int(maxf(game.best_distance, game.distance)), 12, MUTED)
-	text(Vector2(480, 23), "ENERGY  %d%%" % int(game.rider.energy), 14)
-	draw_rect(Rect2(480, 35, 160, 10), Color("#58605a"))
-	draw_rect(Rect2(480, 35, 160 * game.rider.energy / 100.0, 10), GREEN if game.rider.sheltered else GOLD)
-	text(Vector2(685, 25), game.wind.phase(), 17)
-	var detail: String = game.wind.warning()
-	if game.rider.sheltered:
-		detail = "SHELTERED"
-	elif game.rider.cooldown_left > 0.0:
-		detail = "BUMP — KEEP RIDING"
-	text(Vector2(685, 48), detail, 11, GREEN if game.rider.sheltered else MUTED)
-
-func _draw_overlay() -> void:
-	if game.state == game.RunState.RUNNING:
-		return
+func draw_overlay(c: Node2D) -> void:
+	if game.state == game.RunState.RUNNING: return
 	if game.state == game.RunState.CRASHED:
-		draw_rect(Rect2(0, 0, 960, 540), Color(0.65, 0.2, 0.12, 0.18))
+		c.draw_rect(Rect2(0,0,960,540),Color(0.65,0.2,0.12,0.18))
 		return
-	draw_rect(Rect2(0, 66, 960, 474), Color(0.06, 0.1, 0.11, 0.70))
-	draw_rect(Rect2(185, 140, 590, 270), Color("#293638"))
-	draw_rect(Rect2(185, 140, 590, 270), GOLD, false, 2)
+	c.draw_rect(Rect2(0,70,960,470),Color(0.06,0.1,0.11,0.65))
+	c.draw_rect(Rect2(165,130,630,285),Color("#293638"))
+	c.draw_rect(Rect2(165,130,630,285),GOLD,false,2)
+	var title: String = "LATE FOR LECTURE"
+	var detail: String = "Ride 1.5 km through Copenhagen to university."
+	var action: String = "ENTER / SPACE  START     ESC  PAUSE"
 	match game.state:
-		game.RunState.READY:
-			text(Vector2(225, 189), "LATE FOR LECTURE", 31, GOLD)
-			text(Vector2(225, 225), "How far can you ride through Copenhagen?", 18)
-			text(Vector2(225, 264), "UP / DOWN or W / S — switch lanes", 17)
-			text(Vector2(225, 293), "Follow bikes for shelter. Avoid cars and barriers.", 16, MUTED)
-			text(Vector2(225, 345), "ENTER / SPACE  START     ESC  PAUSE", 20, GOLD)
-			text(Vector2(225, 384), "Click the game to focus  |  Handheld: A start / C pause", 12, MUTED)
 		game.RunState.PAUSED:
-			text(Vector2(225, 202), "TAKE A BREATHER", 30, GOLD)
-			text(Vector2(225, 266), "Distance, traffic and wind are paused.", 18)
-			text(Vector2(225, 342), "ENTER / SPACE / ESC  RESUME", 21, GOLD)
+			title = "TAKE A BREATHER"
+			detail = "Distance, traffic, energy and wind are paused."
+			action = "ENTER / SPACE / ESC  RESUME"
 		game.RunState.RESULTS:
-			text(Vector2(225, 193), "END OF THE ROAD", 30, GOLD)
-			text(Vector2(225, 244), "%d METRES    /    BEST %d" % [int(game.distance), int(game.best_distance)], 25)
-			text(Vector2(225, 285), "Watch out for " + game.last_hit.to_lower() + " traffic.", 16, MUTED)
-			text(Vector2(225, 343), "ENTER / SPACE  RIDE AGAIN", 23, GOLD)
-			if game.score_write_error:
-				text(Vector2(225, 384), "Best score could not be saved on this device.", 12, MUTED)
+			title = "END OF THE ROAD"
+			detail = "%d m ridden / Best %d m" % [int(game.distance),int(game.best_distance)]
+			action = "ENTER / SPACE  TRY AGAIN"
+		game.RunState.SUCCESS:
+			title = "MADE IT TO UNIVERSITY!"
+			detail = "1.5 km in %d:%02d. You made it to class." % [int(game.elapsed)/60,int(game.elapsed)%60]
+			action = "ENTER / SPACE  RIDE AGAIN"
+	text(c,Vector2(200,180),title,28,GOLD)
+	text(c,Vector2(200,221),detail,19)
+	text(c,Vector2(200,261),"UP / DOWN or W / S — switch lanes",19)
+	text(c,Vector2(200,298),"Draft to save energy. Ease off, recover, go again.",17,MUTED)
+	text(c,Vector2(200,350),action,20,GOLD)
+	text(c,Vector2(200,389),"Click game to focus  |  Handheld: A start / C pause",14,MUTED)
+	if game.score_write_error:
+		text(c,Vector2(200,408),"Best score could not be saved.",13,MUTED)

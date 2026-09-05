@@ -3,7 +3,7 @@ const Actor = preload("res://scripts/cycling/traffic_actor.gd")
 const Definition = preload("res://scripts/cycling/traffic_definition.gd")
 @export var seed_value: int = 20260905
 @export var maximum_actors: int = 24
-@export var spawn_distance: float = 66.0
+@export var spawn_distance: float = 78.0
 @export var safe_start_seconds: float = 5.0
 @export var initial_interval: float = 5.0
 @export var final_interval: float = 2.8
@@ -44,19 +44,19 @@ func make_actor(kind: String, lane_id: int, at_distance: float):
 	match kind:
 		"bus":
 			spec.speed = -10.0
-			spec.contact_size = Vector2(9.0, 0.40)
+			spec.contact_size = Vector2(13.0, 0.40)
 		"car":
 			spec.speed = -12.0
-			spec.contact_size = Vector2(4.0, 0.36)
+			spec.contact_size = Vector2(8.0, 0.36)
 		"cyclist":
-			spec.speed = 4.8
-			spec.contact_size = Vector2(1.5, 0.30)
+			spec.speed = 7.8
+			spec.contact_size = Vector2(5.0, 0.30)
 		"pedestrian":
 			spec.speed = -1.4
-			spec.contact_size = Vector2(0.7, 0.28)
+			spec.contact_size = Vector2(2.0, 0.28)
 		_:
 			spec.speed = 0.0
-			spec.contact_size = Vector2(2.0, 0.36)
+			spec.contact_size = Vector2(4.0, 0.36)
 	var actor = pool.pop_back() if not pool.is_empty() else Actor.new()
 	actor.configure(spec, at_distance)
 	return actor
@@ -84,7 +84,7 @@ func step(delta: float, elapsed: float, rider_distance: float, rider_lane: int, 
 	# Conservative checks at exhausted/headwind, calm, and full/tailwind speeds.
 	# Runtime movement is continuous; graph edges use the same swept hit test.
 	var safe: bool = true
-	for speed_value in [1.8, 3.6, 8.0, 9.6]:
+	for speed_value in [2.7, 5.4, 9.0, 12.0, 14.4]:
 		if not has_route(combined, rider_distance, rider_lane, speed_value, rider_size):
 			safe = false
 			break
@@ -121,13 +121,13 @@ func has_route(candidates: Array, rider_distance: float, rider_lane: int, speed_
 		reachable = following
 	return true
 
-func find_leader(rider_distance: float, lane_position: float, transitioning: bool):
+func find_leader(rider_distance: float, lane_position: float, transitioning: bool, rider_width: float = 5.0):
 	if transitioning or absf(lane_position - 3.0) > 0.01:
 		return null
 	var nearest = null
 	var gap_best: float = 7.0
 	for actor in actors:
-		var gap: float = actor.distance - rider_distance
+		var gap: float = actor.distance - rider_distance - (actor.definition.contact_size.x + rider_width) * 0.5
 		if actor.definition.kind == "cyclist" and actor.definition.lane == 3 and gap >= 2.0 and gap <= 6.0 and gap < gap_best:
 			gap_best = gap
 			nearest = actor

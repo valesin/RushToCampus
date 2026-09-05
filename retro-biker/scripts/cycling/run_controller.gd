@@ -4,8 +4,12 @@ const WindScript = preload("res://scripts/cycling/wind_controller.gd")
 const DirectorScript = preload("res://scripts/cycling/traffic_director.gd")
 const ActorScript = preload("res://scripts/cycling/traffic_actor.gd")
 const PresentationScript = preload("res://scripts/cycling/presentation.gd")
-enum RunState { READY, RUNNING, PAUSED, CRASHED, RESULTS }
+const AudioScript = preload("res://scripts/cycling/cycling_audio.gd")
+var cycling_audio
+
+enum RunState { READY, RUNNING, PAUSED, CRASHED, RESULTS, SUCCESS }
 @export var score_path: String = "user://cycling_best.json"
+@export var route_length: float = 1500.0
 @export var pixels_per_metre: float = 12.0
 var state: RunState = RunState.READY
 var rider = RiderScript.new()
@@ -35,7 +39,11 @@ func _ready() -> void:
 	best_distance = read_best(score_path)
 	rider.reset()
 	traffic.reset()
-	GameManager.play_game()
+	GameManager.stop_music()
+	cycling_audio = AudioScript.new()
+	cycling_audio.name = "CyclingAudio"
+	cycling_audio.game = self
+	add_child(cycling_audio)
 
 func _exit_tree() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
@@ -50,11 +58,20 @@ func start_run() -> void:
 	crash_left = 0.0
 	last_hit = ""
 	state = RunState.RUNNING
-	Sfx.play("select")
+	if cycling_audio != null: cycling_audio.reset()
 
 func _unhandled_input(event: InputEvent) -> void:
+	# Consume distinct key edges too, so a quick tap between physics ticks is not lost.
+	if state == RunState.RUNNING and not event.is_echo():
+		if event.is_action_pressed("cycling_up"):
+			rider.lane_input(-1)
+		elif event.is_action_pressed("cycling_down"):
+			rider.lane_input(1)
+		elif event.is_action_released("cycling_up") or event.is_action_released("cycling_down"):
+			if not Input.is_action_pressed("cycling_up") and not Input.is_action_pressed("cycling_down"):
+				rider.lane_input(0)
 	if event.is_action_pressed("cycling_confirm") and not event.is_echo():
-		if state == RunState.READY or state == RunState.RESULTS:
+		if state == RunState.READY or state == RunState.RESULTS or state == RunState.SUCCESS:
 			start_run()
 		elif state == RunState.PAUSED:
 			state = RunState.RUNNING
@@ -82,14 +99,19 @@ func simulate(delta: float) -> void:
 		return
 	elapsed += delta
 	wind.step(delta)
-	var leader = traffic.find_leader(distance, rider.lane_position, rider.transition_left > 0.0)
+	var leader = traffic.find_leader(distance, rider.lane_position, rider.transition_left > 0.0, rider.contact_size.x)
 	rider.sheltered = leader != null
 	var values: Vector2 = wind.values(rider.sheltered)
 	var lead_speed: float = leader.definition.speed if leader != null else -1.0
 	rider.step(delta, values.x, values.y, lead_speed)
 	previous_distance = distance
-	distance += rider.speed * delta
-	traffic.step(delta, elapsed, distance, rider.lane, rider.contact_size)
+	var travel_delta: float = minf(delta, maxf(0.0, route_length - distance) / maxf(rider.speed, 0.01))
+	if travel_delta < delta:
+		elapsed -= delta - travel_delta
+		wind.elapsed -= delta - travel_delta
+		rider.lane_position = lerpf(rider.previous_lane_position, rider.lane_position, travel_delta / delta)
+	distance += rider.speed * travel_delta
+	traffic.step(travel_delta, elapsed, distance, rider.lane, rider.contact_size)
 	for actor in traffic.actors:
 		var start := Vector2(actor.previous_distance - previous_distance, actor.definition.lane - rider.previous_lane_position)
 		var end := Vector2(actor.distance - distance, actor.definition.lane - rider.lane_position)
@@ -99,6 +121,13 @@ func simulate(delta: float) -> void:
 			if state != RunState.RUNNING:
 				break
 
+	if state == RunState.RUNNING and distance >= route_length - 0.0001:
+		distance = route_length
+		state = RunState.SUCCESS
+		best_distance = maxf(best_distance, distance)
+		save_best()
+		if cycling_audio != null: cycling_audio.stop_motion()
+
 func contact(actor) -> void:
 	if actor.lethal():
 		last_hit = actor.definition.kind.to_upper()
@@ -107,12 +136,12 @@ func contact(actor) -> void:
 		if distance > best_distance:
 			best_distance = distance
 			save_best()
-		Sfx.play("gameover")
+		if cycling_audio != null: cycling_audio.hit(true)
 	elif not actor.encountered:
 		actor.encountered = true
 		if rider.minor_hit():
 			last_hit = "BUMP — KEEP RIDING"
-			Sfx.play("hurt")
+			if cycling_audio != null: cycling_audio.hit(false)
 
 static func read_best(path: String) -> float:
 	if not FileAccess.file_exists(path):

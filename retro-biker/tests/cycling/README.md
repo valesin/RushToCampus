@@ -1,26 +1,30 @@
-# Cycling runner verification — 5 September 2026
-
-Branch: codex/copenhagen-cycling-runner. Entry: scenes/cycling/CyclingGame.tscn.
-Original MainMenu/Level scenes and platformer scripts remain independently available. A direct Level smoke probe loaded successfully; it retained a pre-existing sky.jpg UID fallback warning. This was a load smoke check, not a full replay of all four platformer levels.
-
+# Three-minute commute verification — 5 September 2026
 ## Reproduce
-Submit the complete contents of gameplay_probe.txt as RunVerification.probe_source through Summer MCP, max_seconds 25. The base class is supplied by Summer's verification runtime, so keep the stored probe as .txt. It calls runner_checks.gd, injects real confirm/pause actions, stages every actor category and captures both animation frames plus results. Test saves use isolated paths, not the player's cycling_best.json.
+Run gameplay_probe.txt through Summer MCP RunVerification (max_seconds25) for runner_checks.gd and start/pause/retry checks.
+Run commute_keyboard_probe.txt (max_seconds180) for the full traffic commute. It uses real key events, a look-ahead test driver and 4x simulation speed. The test deadline ignores game time scaling. This is an automated walkthrough, not a human difficulty assessment.
+Run parallax_probe.txt (max_seconds30) for quick taps, native-rate desktop frame timings and raw-pixel comparisons at tile boundaries.
+## Evidence
+- 42 model checks passed with no runtime errors: .godot/summer_verify/21112_8115974. Baseline no-collision ride:175.699s,26 effort transitions, minimum energy19.875.
+- Full keyboard traffic run: .godot/summer_verify/21112_8842151; success at1500m in181.511 game seconds (107.728s wall time),49 accepted encounters,16 lane switches, pause and retry passed; no runtime errors.
+- Rendering/input probe: .godot/summer_verify/21112_8999916; 1ms key tap detected, stationary rendered frame unchanged, maximum mean RGB difference across 0.1m tile-boundary movement0.01741 (<0.035). Captured both sides of240/480/960/1200m and university sign.
+- Desktop hidden-renderer measurement at normal game time:30fps,median33.157ms,p9535.535ms. This is not a Uno Q benchmark.
+## Coverage and limitations
+Energy hysteresis/smoothing, drafting gaps, exhaustion, per-actor penalties, lethal cooldown, swept collisions, any-lane arrival and before/after-finish collisions, persistence/corrupt saves, pause/retry, all authored patterns across five lanes and2.7/5.4/9/12/14.4m/s.
+The18s route graph is a sampled guard, not a proof for arbitrary changing speeds or player decisions. Earlier greedy keyboard drivers crashed; the passing driver favours bike/pedestrian lanes and plans6s ahead. Accelerated probes initially timed out because the test Timer inherited time scale; the saved driver fixes that.
+Flicker was not reproduced as a deterministic old-build failure. The new renderer separates the chroma shader, uses city mipmaps and continuous tile identities; captures show no tile jumps or static flicker. Human review of movement remains useful.
+## Handoff
+Open scenes/cycling/CyclingGame.tscn (now the entry scene). Enter/Space/J start and retry; W/S or arrows move; Escape/L pause. Preserve local pre-existing project feature update,MainMenu edits and backup.
+Physical device playtest belongs to teammates. No new hardware export or deployment performed; the prior build ZIP is stale. Web export is separate.
 
-## Latest evidence
-36 checks passed; finished true; errors_seen empty.
-Local evidence: .godot/summer_verify/21112_5602909/results.json and three screenshots.
-Checks cover lane latch/edges/transitions, wind warning/blend/rates, exhaustion, drafting/matching/release, minor cooldown/once per actor, lethal during cooldown, swept collision including an extreme vehicle crossing the entire viewport in one step, retry/pause, score persistence and corrupt data, authored-pattern escape checks and population bounds.
-
-A separate real-input/natural-traffic run accepted encounters, reached 118.14 m and entered headwind with five actors active. It measured 30 engine fps, median 33.813 ms and p95 35.117 ms between sampled physics-frame signals in the hidden Windows verification instance. These are desktop probe measurements, not a hardware benchmark.
-Evidence: .godot/summer_verify/21112_5472860.
-
-## Fairness limits
-The route graph checks 18 seconds ahead at constant speeds 1.8, 3.6, 8 and 9.6 m/s with swept transitions and added collision margins. Every authored pattern is tested from all five lanes. This is a conservative sampled guard, not a proof covering every possible player action or continuously varying speed. A player can still choose an unsafe route.
-
-## Build and remaining playtest
-Linux arm64 release ZIP exported with separate PCK; ELF machine code 0xB7 confirms AArch64. Compatibility renderer, ETC2/ASTC imports, viewport 960x540 and 60 fps cap configured.
-No USB board detected by adb devices -l. Deployment, physical joystick/button feel, on-screen readability and Uno Q frame rate remain unverified. Follow the summer-uno-q runbook for deployment.
-
-## Team boundaries
-No push or commit performed. Pre-existing MainMenu.tscn edits and project.godot.bak preserved. project.godot combines the pre-existing 4.7 feature update with our input, renderer, display and final entrypoint changes; separate those hunks when reviewing/committing.
-Generated art is provisional. Two magenta-keyed atlases provide pedalling/walking and lamp changes; final transparent frames and seamless road art can replace them. Existing music and Sfx are reused; bespoke cycling/traffic audio remains an art/audio follow-up.
+## Audio and city-details pass — September 5
+- audio_probe.txt (RunVerification max_seconds45): 21/21 passed, zero errors. Evidence .godot/summer_verify/21112_10547714.
+- runner_checks.gd via current-scene probe: 42/42 passed, zero errors. Evidence .godot/summer_verify/21112_11387140.
+- audio_commute_probe.txt (max_seconds240): full 1500m arrival in181.511 game seconds at4x simulation,135.12 wall seconds,49 encounters,16 lane switches,2 bells,maximum4 traffic voices. Keyboard pause and retry passed, music remained stopped, zero errors. Evidence .godot/summer_verify/21112_11019388.
+- Earlier normal-speed test driver crashed at832.414m/95.9 game seconds; it did not complete. Evidence .godot/summer_verify/21112_10672686. Do not present accelerated success as a completed normal-speed human playtest.
+- city_audio_visual_probe.txt (max_seconds40): quick-tap input, static frame stability and all10 tested tile/marker boundaries passed. Largest mean RGB change0.0187603 (<0.035). Evidence .godot/summer_verify/21112_11268821. Plaques captured at180/640/1390m.
+- Hidden desktop render performance:28fps,median35.506ms,p9537.906ms. The60fps target is not established by this measurement.
+- Engine software mix recorded via AudioEffectRecord using Dummy output driver: full ride -29.3 LUFS and -13.7dBFS true peak;45-second mono preview -29.4 LUFS and -11.1dBFS true peak. No measured clipping. This is NOT physical speaker/headphone listening.
+- Old live session had a Windows WASAPI device-invalidated error. Restarted game: zero console/debugger/script errors; remaining warnings are existing time-display integer division, Sfx parameter shadowing, and editor focus.
+- Perceptual audition on laptop speakers/headphones and a final audit for intelligible speech, incidental music/horns in field recordings remain unverified. Street ambience is low-passed to suppress speech; no claim that filtering proves every voice is unintelligible.
+- Capture file generated by the full probe: user://cycling-full-commute.wav. Long MCP verification calls may time out before the child completes; inspect the matching .godot/summer_verify directory for results.json before retrying.
+- CC0 author/source/licence and edit records ship in assets/cycling/audio. Export preset now includes those text files; no export/deployment was run. Local changes are not pushed.

@@ -32,7 +32,7 @@ static func run(game) -> Dictionary:
 	checks["lower_boundary"] = rider.lane == 4
 	rider.energy = 0.0
 	rider.step(1.0, 0.75, 0.0)
-	checks["exhaustion_keeps_moving"] = is_equal_approx(rider.speed, 3.6)
+	checks["exhaustion_keeps_moving"] = rider.speed > 0.0 and rider.recovering
 	rider.free()
 
 	var wind = Wind.new()
@@ -41,10 +41,10 @@ static func run(game) -> Dictionary:
 	wind.elapsed = 12.5
 	checks["wind_blends"] = is_equal_approx(wind.values(false).x, 0.875)
 	wind.elapsed = 13.0
-	checks["headwind_rates"] = wind.values(false) == Vector2(0.75, -5.0)
-	checks["sheltered_rates"] = wind.values(true) == Vector2(0.9, 4.0)
+	checks["headwind_rates"] = wind.values(false) == Vector2(0.75, -3.0)
+	checks["sheltered_rates"] = wind.values(true) == Vector2(0.9, 0.0)
 	wind.elapsed = 37.0
-	checks["tailwind_rates"] = wind.values(false) == Vector2(1.2, 6.0)
+	checks["tailwind_rates"] = wind.values(false) == Vector2(1.2, 3.0)
 	wind.free()
 
 	game.start_run()
@@ -52,12 +52,12 @@ static func run(game) -> Dictionary:
 	game.traffic.enabled = false
 	game.wind.elapsed = 13.0
 	game.rider.energy = 60.0
-	var lead = game.traffic.make_actor("cyclist", 3, 4.0)
+	var lead = game.traffic.make_actor("cyclist", 3, 9.0)
 	game.traffic.actors.append(lead)
 	for i in 120:
 		game.simulate(1.0 / 60.0)
-	checks["draft_gap_stable"] = absf(lead.distance - game.distance - 4.0) < 0.05
-	checks["draft_recovers_energy"] = game.rider.energy > 67.9 and game.rider.sheltered
+	checks["draft_gap_stable"] = absf(lead.distance - game.distance - 9.0) < 0.05
+	checks["draft_conserves_energy"] = absf(game.rider.energy - 58.0) < 0.1 and game.rider.sheltered
 	game.rider.lane_input(0)
 	game.rider.lane_input(-1)
 	game.simulate(1.0 / 60.0)
@@ -118,26 +118,76 @@ static func run(game) -> Dictionary:
 	for pattern in director.PATTERNS:
 		var candidates: Array = []
 		for item in pattern:
-			candidates.append(director.make_actor(item[0], item[1], 66.0 + float(item[2])))
-		for speed_value in [1.8, 3.6, 8.0, 9.6]:
+			candidates.append(director.make_actor(item[0], item[1], director.spawn_distance + float(item[2])))
+		for speed_value in [2.7, 5.4, 9.0, 12.0, 14.4]:
 			for lane_id in range(5):
-				if not director.has_route(candidates, 0.0, lane_id, speed_value, Vector2(1.5, 0.32)):
+				if not director.has_route(candidates, 0.0, lane_id, speed_value, Vector2(5.0, 0.32)):
 					all_patterns_safe = false
 	checks["all_patterns_all_lanes_speed_extremes"] = all_patterns_safe
 	var wall: Array = []
 	for lane_id in range(5):
 		wall.append(director.make_actor("barrier", lane_id, 8.0))
-	checks["impossible_wall_rejected"] = not director.has_route(wall, 0.0, 3, 8.0, Vector2(1.5, 0.32))
+	checks["impossible_wall_rejected"] = not director.has_route(wall, 0.0, 3, 8.0, Vector2(5.0, 0.32))
 	director.reset()
-	director.step(0, 4.99, 0, 3, Vector2(1.5, 0.32))
+	director.step(0, 4.99, 0, 3, Vector2(5.0, 0.32))
 	checks["five_second_safe_start"] = director.actors.is_empty()
 	var maximum_count: int = 0
 	for tick in range(160):
-		director.step(0.5, tick * 0.5 + 5.0, tick * 4.0, 3, Vector2(1.5, 0.32))
+		director.step(0.5, tick * 0.5 + 5.0, tick * 4.0, 3, Vector2(5.0, 0.32))
 		maximum_count = maxi(maximum_count, director.actors.size())
 	checks["seeded_director_bounded"] = maximum_count <= director.maximum_actors and director.accepted > 0
-	checks["minimum_warning_time"] = (960.0 - 240.0) / 12.0 / (9.6 + 12.0) > 1.5
+	checks["minimum_warning_time"] = (960.0 - 240.0) / 12.0 / (14.4 + 12.0) > 1.5
+	checks["spawns_full_bus_offscreen"] = 240.0 + director.spawn_distance * 12.0 - 85.0 > 960.0
 	director.free()
+	game.start_run()
+	game.traffic.enabled = false
+	var transitions: int = 0
+	var was_recovering: bool = false
+	var smooth: bool = true
+	for tick in 20000:
+		var old_speed: float = game.rider.cruising_speed
+		game.simulate(1.0 / 60.0)
+		if absf(game.rider.cruising_speed - old_speed) > 4.0 / 60.0 + 0.001:
+			smooth = false
+		if game.rider.recovering != was_recovering: transitions += 1
+		was_recovering = game.rider.recovering
+		if game.state == game.RunState.SUCCESS: break
+	checks["automatic_energy_cycles"] = transitions >= 10
+	checks["smooth_acceleration"] = smooth
+	checks["three_minute_commute"] = game.elapsed > 160 and game.elapsed < 200 and game.distance == 1500.0
+	checks["university_success"] = game.state == game.RunState.SUCCESS
+	var finish_time: float = game.elapsed
+	game.simulate(1.0)
+	checks["success_freezes"] = game.elapsed == finish_time and game.distance == 1500.0
+	var arrival_all_lanes: bool = true
+	for lane_id in 5:
+		game.start_run()
+		game.distance = 1499.9
+		game.rider.lane = lane_id
+		game.rider.source_lane = lane_id
+		game.rider.lane_position = lane_id
+		game.simulate(1.0/60.0)
+		arrival_all_lanes = arrival_all_lanes and game.state == game.RunState.SUCCESS
+	checks["arrival_any_lane"] = arrival_all_lanes
+	game.start_run()
+	game.distance = 1499.9
+	game.traffic.actors.append(game.traffic.make_actor("car",3,game.distance+6.0))
+	game.simulate(1.0/60.0)
+	checks["collision_before_arrival_wins"] = game.state == game.RunState.CRASHED
+	game.start_run()
+	game.distance = 1499.99
+	var late_car = game.traffic.make_actor("car",3,game.distance+20.0)
+	late_car.definition.speed = -1000.0
+	game.traffic.actors.append(late_car)
+	game.simulate(1.0/60.0)
+	checks["collision_after_arrival_ignored"] = game.state == game.RunState.SUCCESS
+	game.start_run()
+	game.rider.energy = 20.0
+	game.rider.recovering = true
+	game.wind.elapsed = 13.0
+	game.traffic.actors.append(game.traffic.make_actor("cyclist",3,9.0))
+	for i in 30: game.simulate(1.0/60.0)
+	checks["draft_recovers_energy"] = game.rider.energy > 25.9 and game.rider.sheltered
 	game.start_run()
 	game.traffic.enabled = true
 	game.set_physics_process(true)

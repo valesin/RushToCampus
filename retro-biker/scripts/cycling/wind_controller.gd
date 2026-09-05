@@ -5,10 +5,10 @@ extends Node
 @export var calm_multiplier: float = 1.0
 @export var head_multiplier: float = 0.75
 @export var tail_multiplier: float = 1.2
-@export var calm_energy_rate: float = 2.0
-@export var head_energy_rate: float = -5.0
-@export var tail_energy_rate: float = 6.0
-@export var sheltered_energy_rate: float = 4.0
+@export var calm_energy_rate: float = 0.0
+@export var head_energy_rate: float = -3.0
+@export var tail_energy_rate: float = 3.0
+@export var sheltered_energy_rate: float = 0.0
 @export var sheltered_multiplier: float = 0.9
 const SECTIONS: Array[String] = ["CALM", "HEADWIND", "CALM", "TAILWIND"]
 var elapsed: float = 0.0

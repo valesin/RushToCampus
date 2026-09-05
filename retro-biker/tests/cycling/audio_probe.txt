@@ -1,0 +1,95 @@
+extends SummerProbeBase
+var game
+func frames(count: int = 6) -> void:
+	for i in count: await get_tree().process_frame
+func _ready() -> void:
+	await super._ready()
+	game = get_tree().current_scene
+	if game == null or not "cycling_audio" in game:
+		game = load("res://scenes/cycling/CyclingGame.tscn").instantiate()
+		get_tree().root.add_child.call_deferred(game)
+		await get_tree().process_frame
+	await settle()
+	game.score_path = "user://cycling_audio_probe.json"
+	game.set_physics_process(false)
+	game.traffic.enabled = false
+	var sound = game.cycling_audio
+	report("all_streams_loaded",sound.streams.size() == 11)
+	report("no_template_music",not GameManager._music.playing and GameManager._current_track == "")
+	game.start_run()
+	await frames()
+	report("rider_sound_running",sound.rider_voices[0].playing and sound.rider_voices[1].playing)
+	game.wind.elapsed = 14.0
+	await frames(40)
+	var exposed: float = sound.wind_gain_db
+	game.rider.sheltered = true
+	await frames(40)
+	report("shelter_softens_wind",sound.wind_gain_db < exposed-8.0)
+	game.rider.recovering = true
+	await frames()
+	report("recovery_freewheel",sound.rider_voices[2].playing and sound.rider_voices[1].volume_db < -30.0)
+	var cyclist = game.traffic.make_actor("cyclist",3,10.0)
+	game.traffic.actors.append(cyclist)
+	await frames(10)
+	report("bell_once",sound.bell_count == 1 and cyclist.bell_played)
+	await frames(70)
+	report("no_bell_repeat",sound.bell_count == 1)
+	game.state = game.RunState.PAUSED
+	await frames()
+	var weights = sound.district_weights.duplicate()
+	var playback: float = sound.ambience[0].get_playback_position()
+	await frames(10)
+	report("pause_freezes_mix",sound.ambience[0].stream_paused and sound.district_weights == weights and absf(sound.ambience[0].get_playback_position()-playback)<0.08)
+	game.state = game.RunState.RUNNING
+	await frames()
+	report("resume_audio",not sound.ambience[0].stream_paused)
+	game.start_run()
+	report("retry_clears",sound.bell_count == 0 and sound.traffic_owners.count("") == 4 and sound.district_id == 0)
+	var reused = game.traffic.make_actor("cyclist",3,10.0)
+	game.traffic.actors.append(reused)
+	await frames()
+	report("pooled_actor_fresh_bell",sound.bell_count == 1 and reused.bell_played)
+	game.traffic.reset()
+	for i in 7:
+		game.traffic.actors.append(game.traffic.make_actor("bus" if i%2 == 0 else "car",i%3,10.0+i*4.0))
+	await frames()
+	report("traffic_cap",sound.traffic_owners.count("") == 0 and sound.peak_traffic_count == 4)
+	var actor = game.traffic.actors[0]
+	var key_id: String = sound.actor_key(actor)
+	var slot: int = sound.traffic_owners.find(key_id)
+	var right: float = sound.traffic_pans[slot].pan
+	actor.distance = -5.0
+	await frames()
+	slot = sound.traffic_owners.find(key_id)
+	report("pass_right_to_left",right > 0 and sound.traffic_pans[slot].pan < 0)
+	game.traffic.reset()
+	await frames()
+	report("removed_actors_stop",sound.traffic_owners.count("") == 4)
+	game.distance = 420.0
+	game.previous_distance = game.distance
+	await get_tree().create_timer(3.25).timeout
+	report("street_crossfade",sound.district_id == 1 and sound.district_weights[1] > 0.98)
+	save_frame("street_audio")
+	game.distance = 900.0
+	game.previous_distance = game.distance
+	await get_tree().create_timer(3.25).timeout
+	report("campus_crossfade",sound.district_id == 2 and sound.district_weights[2] > 0.98)
+	var minor = game.traffic.make_actor("pedestrian",4,900)
+	game.contact(minor)
+	game.contact(minor)
+	report("minor_once",sound.impact_count == 1)
+	var lethal = game.traffic.make_actor("car",2,900)
+	game.contact(lethal)
+	report("crash_cuts_movement",not sound.rider_voices[0].playing and sound.impact_count == 2 and sound.duck_left > 0)
+	game.start_run()
+	game.distance = 1500
+	game.previous_distance = 1500
+	game.state = game.RunState.SUCCESS
+	await get_tree().create_timer(3.25).timeout
+	report("arrival_quiet",sound.district_id == 2 and not sound.rider_voices[0].playing and not GameManager._music.playing)
+	save_frame("campus_audio")
+	GameManager.play_game()
+	report("platformer_music_restorable",GameManager._music.playing)
+	GameManager.stop_music()
+	report("stop_resets_track",GameManager._current_track == "" and not GameManager._music.playing)
+	finish()

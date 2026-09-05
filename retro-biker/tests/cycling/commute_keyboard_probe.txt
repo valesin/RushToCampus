@@ -1,0 +1,81 @@
+extends SummerProbeBase
+const Actor = preload("res://scripts/cycling/traffic_actor.gd")
+func route_choice(game) -> int:
+	var states: Dictionary = {game.rider.lane: {"cost":0.0,"first":game.rider.lane}}
+	var dt: float = 0.3
+	for tick in 20:
+		var following: Dictionary = {}
+		for lane_from in states:
+			for lane_to in range(maxi(0,lane_from-1),mini(4,lane_from+1)+1):
+				var safe: bool = true
+				for actor in game.traffic.actors:
+					var relative: float = actor.distance-game.distance
+					var velocity: float = actor.definition.speed-game.rider.speed
+					var half: Vector2 = (actor.definition.contact_size+game.rider.contact_size)*0.5+Vector2(2.0,0.15)
+					var a := Vector2(relative+velocity*tick*dt,actor.definition.lane-lane_from)
+					var b := Vector2(relative+velocity*(tick*dt+0.18),actor.definition.lane-lane_to)
+					var end := Vector2(relative+velocity*(tick+1)*dt,actor.definition.lane-lane_to)
+					if Actor.swept_contact(a,b,half) or Actor.swept_contact(b,end,half):
+						safe = false
+						break
+				if not safe: continue
+				var cost: float = states[lane_from].cost + (0.2 if lane_to != lane_from else 0.0) + (0.0 if lane_to == 3 else 0.002 if lane_to == 4 else 0.1)
+				if not following.has(lane_to) or cost < following[lane_to].cost:
+					following[lane_to] = {"cost":cost,"first":lane_to if tick==0 else states[lane_from].first}
+		if following.is_empty(): break
+		states = following
+	var best: int = game.rider.lane
+	var cost_best: float = INF
+	for lane_id in states:
+		if states[lane_id].cost < cost_best:
+			cost_best = states[lane_id].cost
+			best = states[lane_id].first
+	return best
+func _ready() -> void:
+	await super._ready()
+	# Keep the verification deadline in wall time while accelerating gameplay.
+	for child in get_children():
+		if child is Timer: child.ignore_time_scale = true
+	var game = load("res://scenes/cycling/CyclingGame.tscn").instantiate()
+	game.score_path = "user://commute_keyboard_probe.json"
+	get_tree().root.add_child.call_deferred(game)
+	await get_tree().process_frame
+	await settle()
+	await key(KEY_ENTER,50)
+	await key(KEY_ESCAPE,50)
+	var frozen: float = game.distance
+	for i in 8: await get_tree().physics_frame
+	report("keyboard_pause",game.state == game.RunState.PAUSED and game.distance == frozen)
+	await key(KEY_SPACE,50)
+	Engine.time_scale = 4.0
+	var next_capture: float = 400.0
+	var switches: int = 0
+	var next_decision: float = 0.0
+	var started: int = Time.get_ticks_msec()
+	for frame in 4000:
+		await get_tree().physics_frame
+		if game.state != game.RunState.RUNNING: break
+		if game.distance >= next_capture:
+			save_frame("district_"+str(int(next_capture)))
+			next_capture += 400.0
+		if game.rider.transition_left > 0: continue
+		if game.elapsed < next_decision: continue
+		next_decision = game.elapsed + 0.3
+		var current: int = game.rider.lane
+		var choice: int = route_choice(game)
+		if choice != current:
+			await key(KEY_UP if choice<current else KEY_DOWN,10)
+			switches += 1
+			for i in 2: await get_tree().physics_frame
+	Engine.time_scale = 1.0
+	for i in 40: await get_tree().physics_frame
+	report("keyboard_arrived",game.state == game.RunState.SUCCESS)
+	report("journey_seconds",game.elapsed)
+	report("distance",game.distance)
+	report("lane_switches",switches)
+	report("accepted_encounters",game.traffic.accepted)
+	report("wall_seconds",(Time.get_ticks_msec()-started)/1000.0)
+	save_frame("keyboard_finish")
+	await key(KEY_SPACE,50)
+	report("keyboard_retry",game.state == game.RunState.RUNNING and game.distance < 3)
+	finish()

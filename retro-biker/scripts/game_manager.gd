@@ -49,6 +49,10 @@ func _load_loop(path: String) -> AudioStream:
 		s.loop_end = s.data.size() / 2     # 16-bit mono -> 2 bytes per frame
 	return s
 
+func stop_music() -> void:
+	_music.stop()
+	_current_track = ""
+
 func play_menu() -> void:
 	_play("menu", _menu_stream)
 

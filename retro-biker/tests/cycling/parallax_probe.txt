@@ -1,0 +1,56 @@
+extends SummerProbeBase
+func _ready() -> void:
+	await super._ready()
+	var game = load("res://scenes/cycling/CyclingGame.tscn").instantiate()
+	game.score_path = "user://commute_visual_probe.json"
+	get_tree().root.add_child.call_deferred(game)
+	await get_tree().process_frame
+	await settle()
+	await key(KEY_ENTER,50)
+	await key(KEY_UP,1)
+	for i in 20: await get_tree().physics_frame
+	report("quick_tap_detected",game.rider.lane == 2)
+	game.traffic.enabled = false
+	var timings: Array[float] = []
+	var before: int = Time.get_ticks_usec()
+	for i in 240:
+		await get_tree().process_frame
+		timings.append(float(Time.get_ticks_usec()-before)/1000.0)
+		before = Time.get_ticks_usec()
+	timings.sort()
+	report("fps",Engine.get_frames_per_second())
+	report("median_frame_ms",timings[timings.size()/2])
+	report("p95_frame_ms",timings[int(timings.size()*0.95)])
+	game.set_physics_process(false)
+	var largest_change: float = 0.0
+	for boundary in [240.0,480.0,960.0,1200.0]:
+		game.distance = boundary-0.05
+		game.previous_distance = game.distance
+		await settle(2)
+		var a: Image = get_viewport().get_texture().get_image()
+		save_frame("before_"+str(int(boundary)))
+		game.distance = boundary+0.05
+		game.previous_distance = game.distance
+		await settle(2)
+		var b: Image = get_viewport().get_texture().get_image()
+		save_frame("after_"+str(int(boundary)))
+		var difference: float = 0.0
+		var count: int = 0
+		for x in range(0,960,8):
+			for y in range(70,186,8):
+				var ca: Color = a.get_pixel(x,y)
+				var cb: Color = b.get_pixel(x,y)
+				difference += absf(ca.r-cb.r)+absf(ca.g-cb.g)+absf(ca.b-cb.b)
+				count += 3
+		largest_change = maxf(largest_change,difference/count)
+	report("max_boundary_rgb_change",largest_change)
+	report("no_boundary_jump",largest_change < 0.035)
+	game.distance = 1297.0
+	game.previous_distance = game.distance
+	await settle(2)
+	save_frame("university_sign")
+	var static_a: Image = get_viewport().get_texture().get_image()
+	await settle(4)
+	var static_b: Image = get_viewport().get_texture().get_image()
+	report("stationary_skyline_stable",static_a.get_data() == static_b.get_data())
+	finish()
