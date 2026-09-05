@@ -2,8 +2,14 @@ extends Node2D
 ## Independent facade, surface, decal/prop, traffic, pickup and HUD canvases.
 const Layer = preload("res://scripts/cycling/presentation_layer.gd")
 const Districts = preload("res://scripts/cycling/districts.gd")
+const CleanTheme = preload("res://scripts/cycling/clean_theme.gd")
 const Layout = preload("res://scripts/cycling/presentation_layout.gd")
 var game
+var clean_theme: bool = true
+var clean_art: RefCounted
+var theme_button: Button
+var original_materials: Dictionary = {}
+var clean_material: ShaderMaterial
 var font: Font = ThemeDB.fallback_font
 var city_texture: Texture2D
 var atlas_frames: Array[Texture2D] = []
@@ -68,8 +74,36 @@ func _ready() -> void:
 	var street_key := ShaderMaterial.new()
 	street_key.shader = load("res://scripts/cycling/street_key.gdshader")
 	for i in [2,4]: layers[i].material = street_key
+	clean_art = CleanTheme.new()
+	clean_material = ShaderMaterial.new()
+	clean_material.shader = load("res://scripts/cycling/clean_key.gdshader")
+	for i in [2,3,4]: original_materials[i] = layers[i].material
+	theme_button = Button.new()
+	theme_button.position = Vector2(200,365)
+	theme_button.size = Vector2(560,34)
+	theme_button.add_theme_font_size_override("font_size",17)
+	theme_button.text = "LOOK: ILLUSTRATED  /  Switch to Colourful"
+	theme_button.pressed.connect(toggle_theme)
+	theme_button.visible = false
+	layers[5].add_child(theme_button)
+	set_clean_theme(GameManager.cycling_clean_theme)
+
+func toggle_theme() -> void:
+	if game.state != game.RunState.PAUSED: return
+	set_clean_theme(not clean_theme)
+	theme_button.release_focus()
+
+func set_clean_theme(enabled: bool) -> void:
+	clean_theme = enabled
+	GameManager.cycling_clean_theme = enabled
+	for i in [2,3,4]: layers[i].material = clean_material if enabled else original_materials[i]
+	theme_button.text = "LOOK: COLOURFUL  /  Switch to Illustrated" if enabled else "LOOK: ILLUSTRATED  /  Switch to Colourful"
+	for layer in layers: layer.queue_redraw()
 
 func _process(_delta: float) -> void:
+	theme_button.visible = game.state == game.RunState.PAUSED
+	var mouse_mode: int = Input.MOUSE_MODE_VISIBLE if game.state != game.RunState.RUNNING else Input.MOUSE_MODE_HIDDEN
+	if Input.mouse_mode != mouse_mode: Input.mouse_mode = mouse_mode
 	render_distance = game.distance
 	if game.state == game.RunState.RUNNING:
 		render_distance = lerpf(game.previous_distance, game.distance, clampf(Engine.get_physics_interpolation_fraction(),0.0,1.0))
@@ -98,7 +132,7 @@ func render_layer(c: Node2D, layer_id: int) -> void:
 			if debug_contacts: draw_contacts(c)
 
 func draw_facades(c: Node2D) -> void:
-	c.draw_rect(Rect2(0,0,960,81),Color("#3a372e"))
+	c.draw_rect(Rect2(0,0,960,Layout.CITY_HEIGHT),Color("#3a372e"))
 	if not city_texture: return
 	var scroll: float = render_distance * game.pixels_per_metre * Districts.BUILDING_RATE
 	var first: int = int(floor(scroll/Districts.TILE_WIDTH))
@@ -106,8 +140,12 @@ func draw_facades(c: Node2D) -> void:
 		var left: float = tile*Districts.TILE_WIDTH-scroll
 		var area: int = district(tile)
 		var first_tile: int = [0,2,4,5][area]
-		var source := Rect2(fposmod((tile-first_tile)*480.0,960.0),CITY_BASELINES[area]-54.0,480.0,54.0)
-		c.draw_texture_rect_region(city_texture,Rect2(left,0,720,81),source,Color("#d1c6b1"))
+		# The enlarged city strip reveals upper floors/landmarks at a wider view.
+		var baseline: float = [272.0,554.0,775.0,1008.0][area] if clean_theme else CITY_BASELINES[area]
+		var source := Rect2(float(posmod(tile-first_tile,2))*500.0,baseline-Layout.CITY_HEIGHT/0.7,720.0/0.7,Layout.CITY_HEIGHT/0.7)
+		var texture: Texture2D = clean_art.city if clean_theme else city_texture
+		if clean_theme: source = CleanTheme.scaled_region(source,texture,Vector2(1536,1024))
+		c.draw_texture_rect_region(texture,Rect2(left,0,720,Layout.CITY_HEIGHT),source,Color.WHITE if clean_theme else Color("#d1c6b1"))
 
 func draw_surfaces(c: Node2D) -> void:
 	var scroll: float = render_distance*game.pixels_per_metre
@@ -119,13 +157,19 @@ func draw_surfaces(c: Node2D) -> void:
 			# Alternate mirrored material tiles have matching pixels at every join.
 			var mirrored: bool = posmod(tile,2) == 1
 			c.draw_set_transform(Vector2(left+512.0 if mirrored else left,Layout.lane_top(lane_id)),0,Vector2(-1 if mirrored else 1,1))
-			c.draw_texture_rect_region(street_materials,Rect2(0,0,512,Layout.LANE_HEIGHT),source,Color("#c8bba4"))
+			var texture: Texture2D = clean_art.materials if clean_theme else street_materials
+			var region: Rect2 = CleanTheme.scaled_region(source,texture,Vector2(1254,1254)) if clean_theme else source
+			var surface_tint: Color = Color.WHITE if clean_theme else Color("#c8bba4")
+			if lane_id == 3: surface_tint = Color(1.0,0.62,1.12)
+			c.draw_texture_rect_region(texture,Rect2(0,0,512,Layout.LANE_HEIGHT),region,surface_tint)
 			c.draw_set_transform(Vector2.ZERO)
 		# Shadow lives within its lane and never changes the playable band.
 		c.draw_line(Vector2(0,Layout.lane_top(lane_id)+6),Vector2(960,Layout.lane_top(lane_id)+6),Color(0,0,0,0.25),2)
 
 func street_art(c: Node2D, kind: String, rect: Rect2, tint: Color = Color.WHITE) -> void:
-	c.draw_texture_rect_region(street_sprites,rect,STREET_REGIONS[kind],tint)
+	var texture: Texture2D = clean_art.details if clean_theme else street_sprites
+	var region: Rect2 = CleanTheme.scaled_region(CleanTheme.DETAILS[kind],texture,Vector2(1254,1254)) if clean_theme else STREET_REGIONS[kind]
+	c.draw_texture_rect_region(texture,rect,region,Color(1,1,1,tint.a) if clean_theme else tint)
 
 func draw_street_details(c: Node2D) -> void:
 	var scroll: float = render_distance*game.pixels_per_metre
@@ -139,11 +183,29 @@ func draw_street_details(c: Node2D) -> void:
 		var x: float = tile*144.0-scroll
 		for lane_id in 3:
 			var y: float = Layout.lane_top(lane_id)+Layout.LANE_HEIGHT*0.53
-			var tint: Color = Color("#a48d46") if lane_id == 0 else Color("#b8af98")
+			if lane_id == 0:
+				# Paired yellow edge dashes distinguish this reserved lane.
+				for offset in [9.0,13.0]:
+					c.draw_rect(Rect2(x,Layout.lane_top(1)-offset,76,2),Color(1.0,0.83,0.29,0.78))
+				continue
+			var tint: Color = Color("#b8af98")
 			for chip in 10:
 				var fade: float = 0.27+float(posmod(tile*17+chip*7+lane_id,9))*0.035
 				tint.a = fade
 				c.draw_rect(Rect2(x+chip*4,y+float(posmod(chip,3))*0.3,3.5,2.2),tint)
+	var bus_first: int = int(floor(scroll/384.0))
+	for tile in range(bus_first,bus_first+4):
+		var x: float = tile*384.0-scroll+64.0
+		var y: float = Layout.lane_top(0)+27.0
+		var paint := Color(1.0,0.83,0.29,0.82)
+		# Flat front-view bus pictogram, painted onto the scrolling road surface.
+		c.draw_rect(Rect2(x,y,23,25),paint,false,2)
+		c.draw_rect(Rect2(x+4,y+4,15,9),paint,false,1.5)
+		c.draw_line(Vector2(x+3,y+18),Vector2(x+20,y+18),paint,1.5)
+		for wheel_x in [3.0,17.0]:
+			c.draw_rect(Rect2(x+wheel_x,y+24,3,4),paint)
+			c.draw_circle(Vector2(x+wheel_x+1.5,y+21),1.2,paint)
+		text(c,Vector2(x+34,y+23),"BUS",27,paint)
 	var mark_first: int = int(floor(scroll/288.0))
 	for tile in range(mark_first,mark_first+5):
 		street_art(c,"cycle",Rect2(tile*288.0-scroll,Layout.lane_top(3)+36,52,24),Color(0.85,0.81,0.70,0.58))
@@ -151,15 +213,17 @@ func draw_street_details(c: Node2D) -> void:
 	var prop_first: int = int(floor(scroll/720.0))
 	for tile in range(prop_first,prop_first+3):
 		var x: float = tile*720.0-scroll
-		street_art(c,"planter",Rect2(x+490,48,44,29),Color("#b6b099"))
-		street_art(c,"chair",Rect2(x+175,45,25,32),Color("#c9bea5"))
+		street_art(c,"planter",Rect2(x+490,Layout.CITY_HEIGHT-33,44,29),Color("#b6b099"))
+		street_art(c,"chair",Rect2(x+175,Layout.CITY_HEIGHT-36,25,32),Color("#c9bea5"))
 
 func sprite_art(c: Node2D, kind: String, at: Vector2, phase: float) -> void:
 	if atlas_frames.size() != 2: return
 	var region: Rect2 = REGIONS[kind]
 	var width: float = ART_WIDTHS[kind]
 	var height: float = width*region.size.y/region.size.x
-	c.draw_texture_rect_region(atlas_frames[int(phase)%2],Rect2(at-Vector2(width/2.0,height),Vector2(width,height)),region)
+	var texture: Texture2D = clean_art.frames[int(phase)%2] if clean_theme else atlas_frames[int(phase)%2]
+	if clean_theme: region = CleanTheme.scaled_region(CleanTheme.ACTORS[kind],texture,Vector2(1536,1024))
+	c.draw_texture_rect_region(texture,Rect2(at-Vector2(width/2.0,height),Vector2(width,height)),region)
 
 func draw_traffic(c: Node2D) -> void:
 	var items: Array = []
@@ -200,7 +264,7 @@ func draw_hud(c: Node2D) -> void:
 	var effort: String = "RECOVER %.1fs" % game.rider.recovery_left if game.rider.recovering else "BOOST %.1fs" % game.rider.boost_left if game.rider.boost_left > 0.0 else "BOOST  K / B" if game.rider.boost_ready() else "BOOST NEEDS 20"
 	text(c,Vector2(484,35),effort,16,GREEN if game.rider.recovering else INK)
 	text(c,Vector2(705,28),game.wind.phase(),15,INK)
-	var wind_detail: String = game.wind.warning() if game.wind.warning() != "" else "DRAFT: SHELTERED" if game.rider.sheltered else ""
+	var wind_detail: String = game.wind.warning() if game.wind.warning() != "" else ("DRAFT: +5 ENERGY/s" if not game.rider.recovering and game.rider.boost_left <= 0.0 else "DRAFT: SHELTERED") if game.rider.sheltered else ""
 	text(c,Vector2(677,44),wind_detail,10,MUTED)
 	draw_hud_icon(c,"pin",Vector2(27,28))
 	draw_hud_icon(c,"cap",Vector2(466,28))
@@ -210,7 +274,7 @@ func draw_hud(c: Node2D) -> void:
 	if game.food.feedback_left > 0.0:
 		c.draw_style_box(hud_style,Rect2(374,55,212,23))
 		text(c,Vector2(389,72),game.food.feedback,14,GOLD)
-	c.draw_rect(Rect2(0,79,960*clampf(game.distance/game.route_length,0,1),2),GOLD)
+	c.draw_rect(Rect2(0,Layout.CITY_HEIGHT-2,960*clampf(game.distance/game.route_length,0,1),2),GOLD)
 
 func make_hud_style() -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
@@ -235,7 +299,7 @@ func draw_overlay(c: Node2D) -> void:
 		game.RunState.PAUSED:
 			title = "TAKE A BREATHER"
 			detail = "Distance, traffic, energy and wind are paused."
-			action = "ENTER / SPACE / ESC  RESUME"
+			action = "J / ENTER / SPACE / L / ESC  RESUME"
 		game.RunState.RESULTS:
 			title = "END OF THE ROAD"
 			detail = "%d m ridden / Best %d m" % [int(game.distance),int(game.best_distance)]
@@ -247,10 +311,11 @@ func draw_overlay(c: Node2D) -> void:
 	text(c,Vector2(200,180),title,28,GOLD)
 	text(c,Vector2(200,221),detail,19)
 	text(c,Vector2(200,261),"UP / DOWN or W / S — switch lanes",19)
-	text(c,Vector2(200,298),"K / B: 2s boost · costs 20. At zero: 2s recovery.",17,MUTED)
-	text(c,Vector2(200,325),"Rugbrød +20 · Danish +30 · Draft blocks headwind drain",15,MUTED)
+	text(c,Vector2(200,298),"K: 2s boost · costs 20. At zero: 2s recovery.",17,MUTED)
+	text(c,Vector2(200,325),"Rugbrød +20 · Danish +30 · Draft restores +5 energy/s",15,MUTED)
 	text(c,Vector2(200,350),action,20,GOLD)
-	text(c,Vector2(200,389),"Click game to focus  |  Handheld: A start / C pause",14,MUTED)
+	if game.state != game.RunState.PAUSED:
+		text(c,Vector2(200,389),"Click game to focus  |  J start / L pause",14,MUTED)
 	if game.score_write_error:
 		text(c,Vector2(200,408),"Best score could not be saved.",13,MUTED)
 
@@ -293,3 +358,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			if game.state == game.RunState.RUNNING: game.state = game.RunState.PAUSED
 			elif game.state == game.RunState.PAUSED: game.state = game.RunState.RUNNING
 			get_viewport().set_input_as_handled()
+
+func _input(event: InputEvent) -> void:
+	if game.state != game.RunState.PAUSED or event.is_echo(): return
+	if event.is_action_pressed("cycling_up") or event.is_action_pressed("cycling_down"):
+		theme_button.grab_focus()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("cycling_confirm") and theme_button.has_focus():
+		toggle_theme()
+		get_viewport().set_input_as_handled()

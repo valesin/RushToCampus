@@ -2,6 +2,7 @@ extends Node
 @export var base_speed: float = 14.4
 @export var lane_change_seconds: float = 0.18
 @export var contact_size: Vector2 = Vector2(5.0, 0.32)
+const DRAFT_ENERGY_PER_SECOND: float = 5.0
 const BOOST_SPEED: float = 21.6
 const BOOST_SECONDS: float = 2.0
 const BOOST_COST: float = 20.0
@@ -93,8 +94,8 @@ func step(delta: float, wind_multiplier: float, energy_rate: float, lead_speed: 
 		energy = maxf(0.0, energy + energy_change * delta)
 	else:
 		target_speed = base_speed * wind_multiplier
-		energy_change = 0.0 if sheltered else minf(0.0, energy_rate)
-		energy = maxf(0.0, energy + energy_change * delta)
+		energy_change = DRAFT_ENERGY_PER_SECOND if sheltered else minf(0.0, energy_rate)
+		energy = clampf(energy + energy_change * delta, 0.0, 100.0)
 	cruising_speed = target_speed
 	speed = cruising_speed
 	if slowdown_left > 0.0:

@@ -59,7 +59,7 @@ static func run(game) -> Dictionary:
 	for i in 120:
 		game.simulate(1.0 / 60.0)
 	checks["draft_gap_stable"] = absf(lead.distance - game.distance - 9.0) < 0.05
-	checks["draft_conserves_energy"] = absf(game.rider.energy - 60.0) < 0.1 and game.rider.sheltered
+	checks["draft_restores_energy"] = absf(game.rider.energy - 70.0) < 0.1 and game.rider.sheltered
 	game.rider.lane_input(0)
 	game.rider.lane_input(-1)
 	game.simulate(1.0 / 60.0)
@@ -119,10 +119,13 @@ static func run(game) -> Dictionary:
 	var all_patterns_safe: bool = true
 	var hardest_patterns_safe: bool = true
 	# The route guarantee must hold at both ends of the ramp: shrinking the
-	# comfort margin may never make an authored pattern unsurvivable.
+	# comfort margin may never make an authored pattern unsurvivable. Covers the
+	# vehicle-heavy ROAD_PATTERNS too, which carry most of the weight near the
+	# finish where the margin is tightest.
+	var authored: Array = director.PATTERNS + director.ROAD_PATTERNS
 	for margin in [Director.MARGIN_START, Director.MARGIN_END]:
 		director.contact_margin = margin
-		for pattern in director.PATTERNS:
+		for pattern in authored:
 			var candidates: Array = []
 			for item in pattern:
 				candidates.append(director.make_actor(item[0], item[1], director.spawn_distance + float(item[2])))
@@ -152,16 +155,17 @@ static func run(game) -> Dictionary:
 	checks["traffic_spawn_lead_time"] = (director.spawn_distance - horizon) / (21.6 + 12.0) >= director.spawn_lead_seconds
 
 	# Ramp endpoints: the opening must feel exactly as it does today, and the
-	# finish must land on the floor with no overshoot in between.
+	# finish must land on the floor with no overshoot in between. Progress is
+	# read from rider distance, the same basis as the interval ramp.
 	director.reset()
-	director.step(0.0, 0.0, 0.0, 3, Vector2(5.0, 0.32), 0.0)
+	director.step(0.0, 0.0, 0.0, 3, Vector2(5.0, 0.32))
 	checks["margin_unchanged_at_start"] = director.contact_margin == Director.MARGIN_START
-	director.step(0.0, 0.0, 0.0, 3, Vector2(5.0, 0.32), 1.0)
+	director.step(0.0, 0.0, director.route_length, 3, Vector2(5.0, 0.32))
 	checks["margin_floor_at_finish"] = director.contact_margin == Director.MARGIN_END
 	var margin_monotonic: bool = true
 	var previous_margin: float = INF
 	for sample in 21:
-		director.step(0.0, 0.0, 0.0, 3, Vector2(5.0, 0.32), float(sample) / 20.0)
+		director.step(0.0, 0.0, director.route_length * float(sample) / 20.0, 3, Vector2(5.0, 0.32))
 		if director.contact_margin.x > previous_margin + 0.0001: margin_monotonic = false
 		previous_margin = director.contact_margin.x
 	checks["margin_never_grows"] = margin_monotonic
@@ -172,7 +176,7 @@ static func run(game) -> Dictionary:
 	for lane_id in range(5):
 		director.actors.append(director.make_actor("barrier", lane_id, 8.0))
 	director.next_spawn = 6.0
-	director.step(0.0, 6.0, 0.0, 3, Vector2(5.0, 0.32), 0.0)
+	director.step(0.0, 6.0, 0.0, 3, Vector2(5.0, 0.32))
 	checks["rejected_pattern_retries"] = director.rejected > 0 and absf(director.next_spawn - (6.0 + director.retry_seconds)) < 0.001
 	director.free()
 
@@ -191,8 +195,8 @@ static func run(game) -> Dictionary:
 		game.previous_distance = game.distance
 		game.distance += 14.4 / 60.0
 		game.elapsed += 1.0 / 60.0
-		game.traffic.step(1.0 / 60.0, game.elapsed, game.distance, game.rider.lane, game.rider.contact_size,
-			game.distance / game.route_length)
+		game.traffic.route_length = game.route_length
+		game.traffic.step(1.0 / 60.0, game.elapsed, game.distance, game.rider.lane, game.rider.contact_size)
 		var before_items: int = game.food.items.size()
 		game.food.step(1.0 / 60.0, game)
 		for actor in game.traffic.actors:
@@ -254,6 +258,7 @@ static func run(game) -> Dictionary:
 	checks["collision_after_arrival_ignored"] = game.state == game.RunState.SUCCESS
 	game.start_run()
 	checks.merge(load("res://tests/cycling/energy_checks.gd").run(game))
+	checks.merge(load("res://tests/cycling/difficulty_checks.gd").run(game))
 	game.food.enabled = true
 	game.traffic.enabled = true
 	game.set_physics_process(true)

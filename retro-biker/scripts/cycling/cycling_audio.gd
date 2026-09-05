@@ -17,6 +17,10 @@ var traffic_owners: Array[String] = []
 var traffic_pans: Array[AudioEffectPanner] = []
 var owned_buses: Array[String] = []
 var bell: AudioStreamPlayer
+var lane_change: AudioStreamPlayer
+var cycling_pov: AudioStreamPlayer
+var last_lane: int = 3
+var lane_change_count: int = 0
 var impact: AudioStreamPlayer
 var district_weights: Array[float] = [1.0,0.0,0.0]
 var fade_from: Array[float] = [1.0,0.0,0.0]
@@ -33,7 +37,7 @@ func _ready() -> void:
 	for group in GROUPS:
 		ensure_bus(group)
 		AudioServer.set_bus_volume_db(AudioServer.get_bus_index(group),mix_gain_db)
-	for clip in ["waterfront","street","campus","tyres","chain","freewheel","wind","car","bus","bell","bump"]:
+	for clip in ["waterfront","street","campus","tyres","chain","freewheel","wind","car","bus","bell","bump","lane-change","cycling-pov","crash"]:
 		var path: String = DIR + clip + ".ogg"
 		if ResourceLoader.exists(path):
 			streams[clip] = load(path)
@@ -53,6 +57,8 @@ func _ready() -> void:
 		traffic_owners.append("")
 	bell = make_voice("bell", "CyclingInterface", false)
 	impact = make_voice("bump", "CyclingInterface", false)
+	lane_change = make_voice("lane-change", "CyclingRider", false)
+	cycling_pov = make_voice("cycling-pov", "CyclingAmbience", true)
 	reset()
 
 func ensure_bus(bus_name: String, send: String = "Master") -> void:
@@ -93,6 +99,8 @@ func reset() -> void:
 	bell_count = 0
 	impact_count = 0
 	peak_traffic_count = 0
+	lane_change_count = 0
+	last_lane = game.rider.lane if game != null else 3
 
 func _process(delta: float) -> void:
 	update_mix(delta)
@@ -120,7 +128,14 @@ func update_mix(delta: float) -> void:
 	if not running:
 		stop_motion()
 		return
+	# Observe accepted lane changes, not input presses (blocked/held inputs stay silent).
+	if game.rider.lane != last_lane:
+		last_lane = game.rider.lane
+		lane_change.volume_db = -24.0
+		lane_change.play()
+		lane_change_count += 1
 	var ratio: float = clampf(game.rider.speed / game.rider.base_speed,0.25,1.3)
+	set_loop(cycling_pov, -29.0 + linear_to_db(ratio) + duck)
 	set_loop(rider_voices[0], -24.0 + linear_to_db(ratio))
 	set_loop(rider_voices[1], (-35.0 if game.rider.recovering else -25.0) + linear_to_db(ratio))
 	set_loop(rider_voices[2], -32.0 + linear_to_db(ratio), game.rider.recovering)
@@ -140,6 +155,8 @@ func set_loop(voice: AudioStreamPlayer, db: float, enabled: bool = true) -> void
 	if not voice.playing and voice.stream != null: voice.play()
 
 func stop_motion() -> void:
+	if cycling_pov != null: cycling_pov.stop()
+	if lane_change != null: lane_change.stop()
 	for voice in rider_voices: voice.stop()
 	for i in traffic_voices.size():
 		traffic_voices[i].stop()
@@ -193,6 +210,7 @@ func update_traffic() -> void:
 	peak_traffic_count = maxi(peak_traffic_count,candidates.size())
 
 func hit(lethal: bool) -> void:
+	impact.stream = streams.get("crash" if lethal else "bump")
 	impact.volume_db = -14.0 if lethal else -22.0
 	impact.pitch_scale = 0.85 if lethal else 1.0
 	impact.play()

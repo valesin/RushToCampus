@@ -25,6 +25,10 @@ var best_distance: float = 0.0
 var crash_left: float = 0.0
 var last_hit: String = ""
 var score_write_error: bool = false
+var navigate_results: bool = false
+var result_recorded: bool = false
+var best_at_start: float = 0.0
+const ResultsStore = preload("res://scripts/cycling/results_store.gd")
 
 func _ready() -> void:
 	rider.name = "Rider"
@@ -44,6 +48,8 @@ func _ready() -> void:
 	presentation.game = self
 	add_child(presentation)
 	Input.set_mouse_mode(Input.MOUSE_MODE_HIDDEN)
+	if GameManager.cycling_auto_start:
+		score_path = GameManager.cycling_score_path
 	best_distance = read_best(score_path)
 	rider.reset()
 	traffic.reset()
@@ -53,11 +59,19 @@ func _ready() -> void:
 	cycling_audio.name = "CyclingAudio"
 	cycling_audio.game = self
 	add_child(cycling_audio)
+	if GameManager.cycling_auto_start:
+		GameManager.cycling_auto_start = false
+		navigate_results = true
+		best_distance = maxf(best_distance, GameManager.cycling_best_distance)
+		start_run()
 
 func _exit_tree() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 
 func start_run() -> void:
+	best_at_start = best_distance
+	result_recorded = false
+	score_write_error = false
 	rider.reset()
 	wind.reset()
 	traffic.reset()
@@ -103,6 +117,7 @@ func _physics_process(delta: float) -> void:
 		crash_left -= delta
 		if crash_left <= 0.0:
 			state = RunState.RESULTS
+			finish_result(false)
 	elif state == RunState.RUNNING:
 		var direction: int = int(Input.is_action_pressed("cycling_down")) - int(Input.is_action_pressed("cycling_up"))
 		rider.lane_input(direction)
@@ -126,7 +141,8 @@ func simulate(delta: float) -> void:
 		wind.elapsed -= delta - travel_delta
 		rider.lane_position = lerpf(rider.previous_lane_position, rider.lane_position, travel_delta / delta)
 	distance += rider.speed * travel_delta
-	traffic.step(travel_delta, elapsed, distance, rider.lane, rider.contact_size, distance / maxf(route_length, 0.01))
+	traffic.route_length = route_length
+	traffic.step(travel_delta, elapsed, distance, rider.lane, rider.contact_size)
 	for actor in traffic.actors:
 		var start := Vector2(actor.previous_distance - previous_distance, actor.definition.lane - rider.previous_lane_position)
 		var end := Vector2(actor.distance - distance, actor.definition.lane - rider.lane_position)
@@ -145,6 +161,7 @@ func simulate(delta: float) -> void:
 		best_distance = maxf(best_distance, distance)
 		save_best()
 		if cycling_audio != null: cycling_audio.stop_motion()
+		finish_result(true)
 
 func contact(actor) -> void:
 	if actor.lethal():
@@ -161,25 +178,16 @@ func contact(actor) -> void:
 			last_hit = "BUMP — KEEP RIDING"
 			if cycling_audio != null: cycling_audio.hit(false)
 
+func finish_result(won: bool) -> void:
+	if result_recorded: return
+	result_recorded = true
+	if not navigate_results: return
+	GameManager.record_cycling_result({"won": won, "distance": distance,
+		"elapsed": elapsed, "food": food.collected, "best": best_distance,
+		"new_record": distance > best_at_start + 0.01, "save_error": score_write_error})
+
 static func read_best(path: String) -> float:
-	if not FileAccess.file_exists(path):
-		return 0.0
-	var file := FileAccess.open(path, FileAccess.READ)
-	if file == null:
-		return 0.0
-	var parser := JSON.new()
-	if parser.parse(file.get_as_text()) != OK:
-		return 0.0
-	var parsed = parser.data
-	if not parsed is Dictionary:
-		return 0.0
-	var value = parsed.get("best_distance", 0.0)
-	if not (value is float or value is int):
-		return 0.0
-	return maxf(0.0, float(value)) if is_finite(float(value)) else 0.0
+	return ResultsStore.read_best(path)
 
 func save_best() -> void:
-	var file := FileAccess.open(score_path, FileAccess.WRITE)
-	score_write_error = file == null
-	if file != null:
-		file.store_string(JSON.stringify({"best_distance": best_distance}))
+	score_write_error = not ResultsStore.write_best(best_distance, score_path)

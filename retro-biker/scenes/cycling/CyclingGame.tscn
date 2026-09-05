@@ -1,6 +1,6 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3 uid="uid://drfqb7xalm8nk"]
 
-[ext_resource type="Script" path="res://scripts/cycling/run_controller.gd" id="1"]
+[ext_resource type="Script" uid="uid://cfg8s206lonep" path="res://scripts/cycling/run_controller.gd" id="1"]
 
-[node name="CyclingGame" type="Node2D"]
+[node name="CyclingGame" type="Node2D" unique_id=144128877]
 script = ExtResource("1")

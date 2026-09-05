@@ -12,7 +12,7 @@ func run_checks() -> void:
 	game.set_physics_process(false)
 	game.traffic.enabled = false
 	game.food.enabled = false
-	checks.layout_85_15 = Layout.CITY_HEIGHT == 81.0 and is_equal_approx(Layout.LANE_HEIGHT*5,459.0)
+	checks.layout_75_25 = Layout.CITY_HEIGHT == 135.0 and is_equal_approx(Layout.LANE_HEIGHT*5,405.0)
 	checks.horizontal_scale_preserved = game.pixels_per_metre == 12.0 and Layout.PLAYER_X == 240.0
 	checks.layer_separation = game.presentation.layers.size() == 6
 	checks.native_sprite_widths = game.presentation.ART_WIDTHS == {"player":82.0,"cyclist":82.0,"car":110.0,"bus":170.0,"pedestrian":40.0,"barrier":55.0}
