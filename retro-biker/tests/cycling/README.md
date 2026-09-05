@@ -22,7 +22,7 @@ Web-only audio streaming avoids the observed sample-loop allocation failure and 
 
 ## Difficulty ramp and risk-weighted pickups — 5 September 2026
 
-Design: `docs/superpowers/specs/2026-09-05-difficulty-ramp-design.md`. Difficulty rises with **route distance**, not elapsed time, so a boosting rider cannot outrun their own curve. `run_controller` passes `distance / route_length` into `traffic.step()`.
+Design: `docs/superpowers/specs/2026-09-05-difficulty-ramp-design.md`. Difficulty rises with **route distance**, not elapsed time, so a boosting rider cannot outrun their own curve. Progress comes from `traffic.route_progress(rider_distance)`; `run_controller` assigns `traffic.route_length` each frame. (Before the energy-branch merge this section described a `progress` argument on `step()`, which no longer exists.)
 
 Precision: the route-check padding is now a director field interpolated from `Vector2(1.0, 0.15)` at the start line down to `Vector2(0.5, 0.075)` at university. It is a field rather than a parameter so the pickup corridors `food_director` validates through `has_route` inherit the current difficulty automatically. The `dt = 0.20` lane-change budget is deliberately untouched, since it also sets the 18 s planning horizon.
 
@@ -39,6 +39,16 @@ Seeded full route at 14.4 m/s, against the pre-change baseline in the section be
 Full keyboard-driven commute still completes: 1500 m arrival in 135.284 game seconds at 4x simulation (98.613 wall seconds), 32 accepted encounters, 4 lane switches, arriving with 68 energy; keyboard pause and retry pass; no runtime errors. Evidence .godot/summer_verify/1232_1770145, frames at 400/800/1200 m and finish. The 1200 m frame shows a rugbrød in the bus lane beside a barrier while the rider drafts in the bike lane, which is the intended risk/reward read. This is an automated look-ahead driver, not a human difficulty assessment; only 4 lane switches were needed, so whether the ramp actually feels challenging to a person remains unverified.
 
 Long MCP verification calls time out before this probe completes; read results.json from the matching summer_verify directory rather than retrying.
+
+### Merge with the energy-boost branch — 5 September 2026
+
+Both branches independently added a distance-driven ramp and converged on the same 5.0 → 2.2 s spawn interval. Resolved onto the energy branch's structure: its `route_progress`/`spawn_interval`/`choose_pattern` and `ROAD_PATTERNS` composition ramp are the single progress basis, with the margin ramp, `retry_seconds` and the 118 m offscreen horizon layered on top. Difficulty now has three axes — interval, pattern composition (15% → 80% vehicle-heavy) and precision — so it ramps harder than either branch alone; the knobs are all exported if it needs dialling back after a human playtest.
+
+`all_patterns_safe_at_max_difficulty` was extended to cover `ROAD_PATTERNS`, which carry most of the weight near the finish where the margin is tightest, and `difficulty_checks` now derives from `spawn_distance` instead of a literal 78.
+
+Evidence: 96/96 model checks pass, zero failures (.godot/summer_verify/1232_2931644). Seeded full route at 14.4 m/s: encounters 10 first half versus 14 second, accepted 24, rejected 16, peak 7 live actors against the cap of 24, final margin 0.5, spawn distance 118. Rugbrød 14 and Danishes 4, both at baseline. Pickups by lane 0 to 4: 7/6/2/1/2, so 15 of 18 landed in the exposed vehicle lanes.
+
+**Local verification blocker:** the merge brings in `gl_compatibility/driver.windows="opengl3_angle"` (commit ae87022, added to avoid an Intel OpenGL crash). Under Proton on Linux it makes every `RunVerification` child die instantly with access violation `0xC0000005` and an empty `errors.log`, including a trivial probe. The 96/96 run above was measured with that line temporarily removed; it has been restored, since it protects a teammate's machine. Remove it locally to verify, or make the override conditional. This is an environment conflict, not a code fault.
 
 ## Offscreen spawning pass — 5 September 2026
 
