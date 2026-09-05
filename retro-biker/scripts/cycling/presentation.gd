@@ -158,7 +158,9 @@ func draw_surfaces(c: Node2D) -> void:
 			c.draw_set_transform(Vector2(left+512.0 if mirrored else left,Layout.lane_top(lane_id)),0,Vector2(-1 if mirrored else 1,1))
 			var texture: Texture2D = clean_art.materials if clean_theme else street_materials
 			var region: Rect2 = CleanTheme.scaled_region(source,texture,Vector2(1254,1254)) if clean_theme else source
-			c.draw_texture_rect_region(texture,Rect2(0,0,512,Layout.LANE_HEIGHT),region,Color.WHITE if clean_theme else Color("#c8bba4"))
+			var surface_tint: Color = Color.WHITE if clean_theme else Color("#c8bba4")
+			if lane_id == 3: surface_tint = Color(1.35,1.35,1.25)
+			c.draw_texture_rect_region(texture,Rect2(0,0,512,Layout.LANE_HEIGHT),region,surface_tint)
 			c.draw_set_transform(Vector2.ZERO)
 		# Shadow lives within its lane and never changes the playable band.
 		c.draw_line(Vector2(0,Layout.lane_top(lane_id)+6),Vector2(960,Layout.lane_top(lane_id)+6),Color(0,0,0,0.25),2)
@@ -180,7 +182,10 @@ func draw_street_details(c: Node2D) -> void:
 		var x: float = tile*144.0-scroll
 		for lane_id in 3:
 			var y: float = Layout.lane_top(lane_id)+Layout.LANE_HEIGHT*0.53
-			var tint: Color = Color("#a48d46") if lane_id == 0 else Color("#b8af98")
+			if lane_id == 0:
+				c.draw_rect(Rect2(x,y,44,3.5),Color("#ffd34a"))
+				continue
+			var tint: Color = Color("#b8af98")
 			for chip in 10:
 				var fade: float = 0.27+float(posmod(tile*17+chip*7+lane_id,9))*0.035
 				tint.a = fade
