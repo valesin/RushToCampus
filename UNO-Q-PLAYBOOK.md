@@ -119,6 +119,51 @@ texture_format/etc2_astc=true
 - If a scene draws thousands of tiny meshes (one draw call each), no setting here
   fixes that — it needs fewer draw calls/particles, not another settings pass.
 
+## Exporting on this laptop (Summer runs under Wine here)
+
+There is no native Linux build of Summer on this machine — the editor is the Windows
+build running in a Bottles prefix called `SummerEngine`, so `summer doctor` reports the
+engine as "not installed" and the headless export has to go through Wine. The pieces:
+
+- Engine: `C:\users\vlr\AppData\Local\SummerEngine\current\Summer.exe` inside the bottle
+  (`~/.var/app/com.usebottles.bottles/data/bottles/bottles/SummerEngine`).
+- Runner: `~/.var/app/com.usebottles.bottles/data/bottles/runners/soda-11.0-7/bin/wine`.
+- The bottle has filesystem access to `~/Games/umu`, and Wine maps `Z:` to `/`, so a
+  project under that folder is reachable as `Z:\home\vlr\Games\umu\...`.
+
+**`DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1` is mandatory.** This is a Mono build of the
+engine, and .NET's globalization layer can't load ICU under Wine. Without the variable the
+export dies in under a second on `Cannot get symbol u_charsToUChars from libicuuc` /
+`Error: 127`, before writing anything — which looks like a broken project rather than a
+host problem. With it, the export runs clean in ~13 s.
+
+```bash
+mkdir -p retro-biker/build
+flatpak run --command=bash com.usebottles.bottles -c '
+export WINEPREFIX=/home/vlr/.var/app/com.usebottles.bottles/data/bottles/bottles/SummerEngine
+export WINEDEBUG=-all
+export DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
+W=/home/vlr/.var/app/com.usebottles.bottles/data/bottles/runners/soda-11.0-7/bin/wine
+"$W" "C:\users\vlr\AppData\Local\SummerEngine\current\Summer.exe" --headless \
+  --path "Z:\home\vlr\Games\umu\bikersgame\retro-biker" \
+  --export-release "Linux arm64 (Uno Q)" \
+  "Z:\home\vlr\Games\umu\bikersgame\retro-biker\build\game-linux-arm64.zip"
+'
+```
+
+- **Run Wine directly, not `bottles-cli run`.** `bottles-cli` swallows the engine's stdout
+  and returns 0 regardless, so a failed export is indistinguishable from a good one.
+- **Exit 0 is not success.** Check that `build/game-linux-arm64.zip` has a timestamp from
+  this run and holds two entries — the binary and a separate `.pck` (~58 MB total here).
+  Create `build/` first; without it the export prints a successful-looking run, exits 0,
+  and writes no file.
+- The arm64 Linux export templates live in the bottle at
+  `AppData/Local/SummerEngine/current/export_templates/4.7.2.stable.mono/` — note the
+  `.mono` folder, matching `Summer.exe --headless --version`. The plain `4.7.2.stable`
+  folder next to it has Windows templates only, and an export against it fails for a
+  missing template.
+- Leaked-RID and `ObjectDB instances were leaked` warnings on shutdown are normal noise.
+
 ## Getting it onto the board
 
 **One-time, per board**, done in **Arduino App Lab** on this laptop with the board
@@ -136,7 +181,8 @@ plugged in over USB-C:
 
 **What actually happens on deploy:**
 1. The game gets exported fresh on this laptop (never reuse an old zip, even if it
-   looks current — a full export only takes 10–20 seconds).
+   looks current — a full export only takes 10–20 seconds). See the section above for
+   how the export runs on this machine.
 2. It's pushed to the board over the same USB-C cable and installed as an app in
    Arduino App Lab.
 3. First deploy also sets up the board itself (slower); later deploys are quick.
