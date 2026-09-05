@@ -159,7 +159,7 @@ func draw_surfaces(c: Node2D) -> void:
 			var texture: Texture2D = clean_art.materials if clean_theme else street_materials
 			var region: Rect2 = CleanTheme.scaled_region(source,texture,Vector2(1254,1254)) if clean_theme else source
 			var surface_tint: Color = Color.WHITE if clean_theme else Color("#c8bba4")
-			if lane_id == 3: surface_tint = Color(1.35,1.35,1.25)
+			if lane_id == 3: surface_tint = Color(1.0,0.62,1.12)
 			c.draw_texture_rect_region(texture,Rect2(0,0,512,Layout.LANE_HEIGHT),region,surface_tint)
 			c.draw_set_transform(Vector2.ZERO)
 		# Shadow lives within its lane and never changes the playable band.
@@ -183,13 +183,28 @@ func draw_street_details(c: Node2D) -> void:
 		for lane_id in 3:
 			var y: float = Layout.lane_top(lane_id)+Layout.LANE_HEIGHT*0.53
 			if lane_id == 0:
-				c.draw_rect(Rect2(x,y,44,3.5),Color("#ffd34a"))
+				# Paired yellow edge dashes distinguish this reserved lane.
+				for offset in [9.0,13.0]:
+					c.draw_rect(Rect2(x,Layout.lane_top(1)-offset,76,2),Color(1.0,0.83,0.29,0.78))
 				continue
 			var tint: Color = Color("#b8af98")
 			for chip in 10:
 				var fade: float = 0.27+float(posmod(tile*17+chip*7+lane_id,9))*0.035
 				tint.a = fade
 				c.draw_rect(Rect2(x+chip*4,y+float(posmod(chip,3))*0.3,3.5,2.2),tint)
+	var bus_first: int = int(floor(scroll/384.0))
+	for tile in range(bus_first,bus_first+4):
+		var x: float = tile*384.0-scroll+64.0
+		var y: float = Layout.lane_top(0)+27.0
+		var paint := Color(1.0,0.83,0.29,0.82)
+		# Flat front-view bus pictogram, painted onto the scrolling road surface.
+		c.draw_rect(Rect2(x,y,23,25),paint,false,2)
+		c.draw_rect(Rect2(x+4,y+4,15,9),paint,false,1.5)
+		c.draw_line(Vector2(x+3,y+18),Vector2(x+20,y+18),paint,1.5)
+		for wheel_x in [3.0,17.0]:
+			c.draw_rect(Rect2(x+wheel_x,y+24,3,4),paint)
+			c.draw_circle(Vector2(x+wheel_x+1.5,y+21),1.2,paint)
+		text(c,Vector2(x+34,y+23),"BUS",27,paint)
 	var mark_first: int = int(floor(scroll/288.0))
 	for tile in range(mark_first,mark_first+5):
 		street_art(c,"cycle",Rect2(tile*288.0-scroll,Layout.lane_top(3)+36,52,24),Color(0.85,0.81,0.70,0.58))
@@ -248,7 +263,7 @@ func draw_hud(c: Node2D) -> void:
 	var effort: String = "RECOVER %.1fs" % game.rider.recovery_left if game.rider.recovering else "BOOST %.1fs" % game.rider.boost_left if game.rider.boost_left > 0.0 else "BOOST  K / B" if game.rider.boost_ready() else "BOOST NEEDS 20"
 	text(c,Vector2(484,35),effort,16,GREEN if game.rider.recovering else INK)
 	text(c,Vector2(705,28),game.wind.phase(),15,INK)
-	var wind_detail: String = game.wind.warning() if game.wind.warning() != "" else ("DRAFT: +2 ENERGY/s" if not game.rider.recovering and game.rider.boost_left <= 0.0 else "DRAFT: SHELTERED") if game.rider.sheltered else ""
+	var wind_detail: String = game.wind.warning() if game.wind.warning() != "" else ("DRAFT: +5 ENERGY/s" if not game.rider.recovering and game.rider.boost_left <= 0.0 else "DRAFT: SHELTERED") if game.rider.sheltered else ""
 	text(c,Vector2(677,44),wind_detail,10,MUTED)
 	draw_hud_icon(c,"pin",Vector2(27,28))
 	draw_hud_icon(c,"cap",Vector2(466,28))
@@ -296,7 +311,7 @@ func draw_overlay(c: Node2D) -> void:
 	text(c,Vector2(200,221),detail,19)
 	text(c,Vector2(200,261),"UP / DOWN or W / S — switch lanes",19)
 	text(c,Vector2(200,298),"K / B: 2s boost · costs 20. At zero: 2s recovery.",17,MUTED)
-	text(c,Vector2(200,325),"Rugbrød +20 · Danish +30 · Draft restores +2 energy/s",15,MUTED)
+	text(c,Vector2(200,325),"Rugbrød +20 · Danish +30 · Draft restores +5 energy/s",15,MUTED)
 	text(c,Vector2(200,350),action,20,GOLD)
 	if game.state != game.RunState.PAUSED:
 		text(c,Vector2(200,389),"Click game to focus  |  Handheld: A start / C pause",14,MUTED)

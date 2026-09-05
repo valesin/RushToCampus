@@ -2,7 +2,7 @@ extends Node
 @export var base_speed: float = 14.4
 @export var lane_change_seconds: float = 0.18
 @export var contact_size: Vector2 = Vector2(5.0, 0.32)
-const DRAFT_ENERGY_PER_SECOND: float = 2.0
+const DRAFT_ENERGY_PER_SECOND: float = 5.0
 const BOOST_SPEED: float = 21.6
 const BOOST_SECONDS: float = 2.0
 const BOOST_COST: float = 20.0

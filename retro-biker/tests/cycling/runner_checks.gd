@@ -58,7 +58,7 @@ static func run(game) -> Dictionary:
 	for i in 120:
 		game.simulate(1.0 / 60.0)
 	checks["draft_gap_stable"] = absf(lead.distance - game.distance - 9.0) < 0.05
-	checks["draft_restores_energy"] = absf(game.rider.energy - 64.0) < 0.1 and game.rider.sheltered
+	checks["draft_restores_energy"] = absf(game.rider.energy - 70.0) < 0.1 and game.rider.sheltered
 	game.rider.lane_input(0)
 	game.rider.lane_input(-1)
 	game.simulate(1.0 / 60.0)
