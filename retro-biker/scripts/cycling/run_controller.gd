@@ -25,6 +25,7 @@ var best_distance: float = 0.0
 var crash_left: float = 0.0
 var last_hit: String = ""
 var score_write_error: bool = false
+var _end_pending: bool = false
 
 func _ready() -> void:
 	rider.name = "Rider"
@@ -41,6 +42,7 @@ func _ready() -> void:
 	add_child(presentation)
 	Input.set_mouse_mode(Input.MOUSE_MODE_HIDDEN)
 	best_distance = read_best(score_path)
+	GameManager.cycling_best_distance = best_distance
 	rider.reset()
 	traffic.reset()
 	food.reset()
@@ -49,6 +51,9 @@ func _ready() -> void:
 	cycling_audio.name = "CyclingAudio"
 	cycling_audio.game = self
 	add_child(cycling_audio)
+	if GameManager.cycling_auto_start:
+		GameManager.cycling_auto_start = false
+		start_run()
 
 func _exit_tree() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
@@ -63,8 +68,17 @@ func start_run() -> void:
 	elapsed = 0.0
 	crash_left = 0.0
 	last_hit = ""
+	_end_pending = false
 	state = RunState.RUNNING
 	if cycling_audio != null: cycling_audio.reset()
+
+func _finish_to_screen(won: bool) -> void:
+	if _end_pending:
+		return
+	_end_pending = true
+	var previous_best: float = GameManager.cycling_best_distance
+	var new_record: bool = distance > previous_best + 0.01 or (won and previous_best < route_length)
+	GameManager.record_cycling_result(won, distance, food.collected, elapsed, best_distance, new_record)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_released("cycling_boost"):
@@ -82,7 +96,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			if not Input.is_action_pressed("cycling_up") and not Input.is_action_pressed("cycling_down"):
 				rider.lane_input(0)
 	if event.is_action_pressed("cycling_confirm") and not event.is_echo():
-		if state == RunState.READY or state == RunState.RESULTS or state == RunState.SUCCESS:
+		if state == RunState.READY:
 			start_run()
 		elif state == RunState.PAUSED:
 			state = RunState.RUNNING
@@ -99,6 +113,7 @@ func _physics_process(delta: float) -> void:
 		crash_left -= delta
 		if crash_left <= 0.0:
 			state = RunState.RESULTS
+			_finish_to_screen(false)
 	elif state == RunState.RUNNING:
 		var direction: int = int(Input.is_action_pressed("cycling_down")) - int(Input.is_action_pressed("cycling_up"))
 		rider.lane_input(direction)
@@ -141,6 +156,7 @@ func simulate(delta: float) -> void:
 		best_distance = maxf(best_distance, distance)
 		save_best()
 		if cycling_audio != null: cycling_audio.stop_motion()
+		_finish_to_screen(true)
 
 func contact(actor) -> void:
 	if actor.lethal():

@@ -12,7 +12,7 @@ config_version=5
 
 config/name="Platform Quest"
 config/description="A grid-based sidescrolling platformer template for Summer Engine."
-run/main_scene="res://scenes/cycling/CyclingGame.tscn"
+run/main_scene="res://scenes/MainMenu.tscn"
 config/features=PackedStringArray("4.7")
 run/max_fps=60.0
 
@@ -88,4 +88,3 @@ cycling_boost={
 textures/canvas_textures/default_texture_filter=0.0
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
-textures/vram_compression/import_etc2_astc=true
