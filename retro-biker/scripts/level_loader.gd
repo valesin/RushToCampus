@@ -74,6 +74,14 @@ func _build(text: String) -> void:
 	if player != null and "kill_y" in player:
 		player.kill_y = level_h + 200.0
 
+	# Drop the new 3D side-character on the ground just right of the player spawn.
+	# Player spawn is two tiles above the solid floor in level_01, and this NPC
+	# has no gravity — so offset down onto the floor.
+	if player != null:
+		var buddy := _spawn("res://scenes/SideCharacter.tscn", player.position + Vector2(48, 64))
+		if buddy != null and buddy.has_method("face"):
+			buddy.face(1)
+
 	# When zoomed out the camera sees more world, so the clamp half-extents
 	# grow by 1/ZOOM.
 	camera.zoom = Vector2(ZOOM, ZOOM)
