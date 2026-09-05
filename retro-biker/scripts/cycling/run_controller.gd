@@ -122,6 +122,7 @@ func simulate(delta: float) -> void:
 		wind.elapsed -= delta - travel_delta
 		rider.lane_position = lerpf(rider.previous_lane_position, rider.lane_position, travel_delta / delta)
 	distance += rider.speed * travel_delta
+	traffic.route_length = route_length
 	traffic.step(travel_delta, elapsed, distance, rider.lane, rider.contact_size)
 	for actor in traffic.actors:
 		var start := Vector2(actor.previous_distance - previous_distance, actor.definition.lane - rider.previous_lane_position)

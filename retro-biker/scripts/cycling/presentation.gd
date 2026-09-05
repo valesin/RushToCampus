@@ -242,7 +242,7 @@ func draw_hud(c: Node2D) -> void:
 	var effort: String = "RECOVER %.1fs" % game.rider.recovery_left if game.rider.recovering else "BOOST %.1fs" % game.rider.boost_left if game.rider.boost_left > 0.0 else "BOOST  K / B" if game.rider.boost_ready() else "BOOST NEEDS 20"
 	text(c,Vector2(484,35),effort,16,GREEN if game.rider.recovering else INK)
 	text(c,Vector2(705,28),game.wind.phase(),15,INK)
-	var wind_detail: String = game.wind.warning() if game.wind.warning() != "" else "DRAFT: SHELTERED" if game.rider.sheltered else ""
+	var wind_detail: String = game.wind.warning() if game.wind.warning() != "" else ("DRAFT: +2 ENERGY/s" if not game.rider.recovering and game.rider.boost_left <= 0.0 else "DRAFT: SHELTERED") if game.rider.sheltered else ""
 	text(c,Vector2(677,44),wind_detail,10,MUTED)
 	draw_hud_icon(c,"pin",Vector2(27,28))
 	draw_hud_icon(c,"cap",Vector2(466,28))
@@ -290,7 +290,7 @@ func draw_overlay(c: Node2D) -> void:
 	text(c,Vector2(200,221),detail,19)
 	text(c,Vector2(200,261),"UP / DOWN or W / S — switch lanes",19)
 	text(c,Vector2(200,298),"K / B: 2s boost · costs 20. At zero: 2s recovery.",17,MUTED)
-	text(c,Vector2(200,325),"Rugbrød +20 · Danish +30 · Draft blocks headwind drain",15,MUTED)
+	text(c,Vector2(200,325),"Rugbrød +20 · Danish +30 · Draft restores +2 energy/s",15,MUTED)
 	text(c,Vector2(200,350),action,20,GOLD)
 	if game.state != game.RunState.PAUSED:
 		text(c,Vector2(200,389),"Click game to focus  |  Handheld: A start / C pause",14,MUTED)

@@ -12,3 +12,6 @@ Commands from game directory:
     godot --headless --path . --script res://tests/cycling/web_checks.gd
     godot --headless --path . --script res://tests/cycling/playthrough.gd
     godot --path . --script res://tests/cycling/theme_checks.gd -- ABSOLUTE_CAPTURE_DIRECTORY
+
+## Drafting and final approach update
+Drafting behind a cyclist restores 2 energy/second during normal riding, capped at 100; boost does not receive a refund and timed recovery is unchanged. The HUD names the gain. Traffic frequency is now distance-based (5.0 seconds at start to 2.2 seconds at the finish), with dedicated car/bus patterns increasingly preferred (15% to 80%). The same escape-route, pickup-reservation and actor-limit gates apply. Updated verification: 84 gameplay checks and nine playthrough/cadence checks pass.

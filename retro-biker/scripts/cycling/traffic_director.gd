@@ -6,7 +6,8 @@ const Definition = preload("res://scripts/cycling/traffic_definition.gd")
 @export var spawn_distance: float = 78.0
 @export var safe_start_seconds: float = 5.0
 @export var initial_interval: float = 5.0
-@export var final_interval: float = 2.8
+@export var final_interval: float = 2.2
+@export var route_length: float = 1500.0
 var food
 const CHECK_SPEEDS: Array[float] = [3.6, 7.2, 7.8, 10.8, 14.4, 15.84, 21.6]
 var actors: Array = []
@@ -26,6 +27,23 @@ const PATTERNS: Array = [
 	[["car", 2, 0.0], ["barrier", 0, 15.0]],
 	[["pedestrian", 4, 0.0], ["barrier", 2, 13.0]]
 ]
+
+const ROAD_PATTERNS: Array = [
+	[["bus",0,0.0],["car",1,18.0]],
+	[["car",1,0.0],["car",2,22.0]],
+	[["bus",0,0.0],["car",2,20.0]]
+]
+
+func route_progress(rider_distance: float) -> float:
+	return clampf(rider_distance / maxf(1.0,route_length),0.0,1.0)
+
+func spawn_interval(rider_distance: float) -> float:
+	return lerpf(initial_interval,final_interval,route_progress(rider_distance))
+
+func choose_pattern(rider_distance: float) -> Array:
+	var road_weight: float = lerpf(0.15,0.80,route_progress(rider_distance))
+	var choices: Array = ROAD_PATTERNS if rng.randf() < road_weight else PATTERNS
+	return choices[rng.randi_range(0,choices.size()-1)]
 
 func reset() -> void:
 	for actor in actors:
@@ -75,8 +93,8 @@ func step(delta: float, elapsed: float, rider_distance: float, rider_lane: int, 
 			pool.append(old)
 	if not enabled or elapsed < next_spawn:
 		return
-	next_spawn = elapsed + lerpf(initial_interval, final_interval, clampf(elapsed / 120.0, 0.0, 1.0))
-	var pattern: Array = PATTERNS[rng.randi_range(0, PATTERNS.size() - 1)]
+	next_spawn = elapsed + spawn_interval(rider_distance)
+	var pattern: Array = choose_pattern(rider_distance)
 	if actors.size() + pattern.size() > maximum_actors:
 		return
 	var candidate: Array = []
